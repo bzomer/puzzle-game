@@ -89,3 +89,10 @@ De propósito, para não contaminar a medição: economia, trilhas de melhoria,
 anúncio de verdade, som, i18n, e o SDK do portal. A tela de volta usa **acúmulo
 falso** — ela existe só para o momento do retorno ser sentido, não simulado com
 fidelidade.
+
+## Testar no celular
+
+`servir-na-rede.bat` serve esta pasta na rede local — o celular abre pelo
+Wi-Fi, sem publicar nada em lugar nenhum. É o mesmo padrão do
+[`06-modelos/testar-no-celular.bat`](../../06-modelos/testar-no-celular.bat),
+menos o export do Godot, que aqui não existe.
