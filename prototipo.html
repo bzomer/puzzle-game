@@ -1,0 +1,875 @@
+<title>Protótipo — puzzle de cor com meta idle</title>
+<style>
+  /* ---- tokens: cromo acromático de propósito. A única cor da tela é o líquido. ---- */
+  :root {
+    --ground:      #e9eaec;
+    --panel:       #ffffff;
+    --panel-sunk:  #dfe1e4;
+    --ink:         #14171b;
+    --ink-dim:     #626a74;
+    --ink-faint:   #939aa3;
+    --line:        #cdd1d6;
+    --line-strong: #a8aeb6;
+    --bom:         #1f7a45;
+    --atencao:     #9a6210;
+    --ruim:        #a3342a;
+    --vidro:       rgba(20, 23, 27, 0.09);
+    --vidro-linha: rgba(20, 23, 27, 0.22);
+    --selecao:     #14171b;
+
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0f1215;
+      --panel:       #171b20;
+      --panel-sunk:  #0a0d10;
+      --ink:         #e6e9ec;
+      --ink-dim:     #949ca6;
+      --ink-faint:   #666e78;
+      --line:        #262c33;
+      --line-strong: #3a424b;
+      --bom:         #4cc27e;
+      --atencao:     #d9a441;
+      --ruim:        #e0685a;
+      --vidro:       rgba(230, 233, 236, 0.07);
+      --vidro-linha: rgba(230, 233, 236, 0.20);
+      --selecao:     #e6e9ec;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0f1215;
+    --panel:       #171b20;
+    --panel-sunk:  #0a0d10;
+    --ink:         #e6e9ec;
+    --ink-dim:     #949ca6;
+    --ink-faint:   #666e78;
+    --line:        #262c33;
+    --line-strong: #3a424b;
+    --bom:         #4cc27e;
+    --atencao:     #d9a441;
+    --ruim:        #e0685a;
+    --vidro:       rgba(230, 233, 236, 0.07);
+    --vidro-linha: rgba(230, 233, 236, 0.20);
+    --selecao:     #e6e9ec;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+  }
+
+  .app {
+    max-width: 620px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ---- painel de instrumentos ---- */
+  .hud {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .hud div {
+    padding: 10px 8px 11px;
+    text-align: center;
+    border-right: 1px solid var(--line);
+  }
+  .hud div:last-child { border-right: 0; }
+  .rot {
+    display: block;
+    font-size: 9.5px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 3px;
+  }
+  .val {
+    display: block;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 19px;
+    line-height: 1;
+    font-weight: 600;
+  }
+  .val small { font-size: 12px; font-weight: 400; color: var(--ink-dim); }
+  .val.bom { color: var(--bom); }
+  .val.ruim { color: var(--ruim); }
+
+  /* ---- tabuleiro ---- */
+  .palco {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    min-height: 0;
+  }
+  canvas { display: block; touch-action: manipulation; }
+
+  /* ---- ações ---- */
+  .acoes {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+  }
+  button {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    padding: 11px 14px;
+    cursor: pointer;
+    flex: 1;
+    transition: background 120ms ease;
+  }
+  button:hover:not(:disabled) { background: var(--panel-sunk); }
+  button:disabled { color: var(--ink-faint); border-color: var(--line); cursor: default; }
+  button:focus-visible { outline: 2px solid var(--selecao); outline-offset: 2px; }
+  button.forte {
+    background: var(--selecao);
+    color: var(--panel);
+    border-color: var(--selecao);
+  }
+  button.forte:hover:not(:disabled) { opacity: 0.86; background: var(--selecao); }
+
+  /* ---- telas sobrepostas ---- */
+  .tela {
+    position: fixed;
+    inset: 0;
+    background: var(--ground);
+    display: none;
+    overflow-y: auto;
+  }
+  .tela.on { display: block; }
+  .folha {
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 28px 20px calc(32px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  h1 {
+    font-size: 12px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    font-weight: 600;
+    margin: 0;
+  }
+  h2 {
+    font-size: 26px;
+    line-height: 1.2;
+    margin: 0;
+    text-wrap: balance;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  p { margin: 0; color: var(--ink-dim); font-size: 14.5px; line-height: 1.55; }
+  p strong { color: var(--ink); font-weight: 600; }
+
+  .grande {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 54px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  th { font-weight: 500; color: var(--ink-dim); }
+  td {
+    text-align: right;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  td.bom { color: var(--bom); }
+  td.atencao { color: var(--atencao); }
+  td.ruim { color: var(--ruim); }
+
+  .veredito {
+    border: 1px solid var(--line-strong);
+    border-left-width: 3px;
+    border-radius: 3px;
+    padding: 14px 16px;
+    background: var(--panel);
+  }
+  .veredito.passa { border-left-color: var(--bom); }
+  .veredito.duvida { border-left-color: var(--atencao); }
+  .veredito.morre { border-left-color: var(--ruim); }
+  .veredito .rot { margin-bottom: 6px; }
+  .veredito p { color: var(--ink); }
+
+  .segs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .segs button { flex: 1 1 auto; min-width: 64px; padding: 9px 10px; font-size: 12.5px; }
+  .segs button[aria-pressed="true"] {
+    background: var(--selecao);
+    color: var(--panel);
+    border-color: var(--selecao);
+  }
+
+  .nota {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  .nota code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: var(--panel-sunk);
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+
+  .brecha { height: 4px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 1ms !important; }
+  }
+</style>
+
+<div class="app">
+  <div class="hud">
+    <div><span class="rot">Tabuleiro</span><span class="val" id="hudTab">1<small>/10</small></span></div>
+    <div><span class="rot">Movimentos</span><span class="val" id="hudMov">0</span></div>
+    <div><span class="rot">Par</span><span class="val" id="hudPar">—</span></div>
+    <div><span class="rot">Tempo</span><span class="val" id="hudTempo">0:00</span></div>
+  </div>
+
+  <div class="palco"><canvas id="tela"></canvas></div>
+
+  <div class="acoes">
+    <button id="btDesfazer" disabled>Desfazer</button>
+    <button id="btReiniciar">Reiniciar</button>
+    <button id="btParei">Parei aqui</button>
+  </div>
+</div>
+
+<!-- Tela de retorno: o acúmulo offline -->
+<div class="tela" id="telaVolta">
+  <div class="folha">
+    <h1>Tela 2 — a volta</h1>
+    <h2 id="voltaTitulo">Enquanto você esteve fora</h2>
+    <div>
+      <div class="grande" id="voltaMoeda">0</div>
+      <p style="margin-top:6px" id="voltaLinha">moedas acumuladas</p>
+    </div>
+
+    <div>
+      <span class="rot" style="margin-bottom:8px">Simular ausência de</span>
+      <div class="segs" id="segsAusencia">
+        <button data-h="0.5" aria-pressed="false">30 min</button>
+        <button data-h="2"   aria-pressed="false">2 h</button>
+        <button data-h="8"   aria-pressed="true">8 h</button>
+        <button data-h="24"  aria-pressed="false">24 h</button>
+      </div>
+    </div>
+
+    <button class="forte" id="btDobrar">▶ Assistir e levar 2×</button>
+    <button id="btVoltarJogo">Voltar ao tabuleiro</button>
+
+    <p class="nota">
+      O teto é de <strong>8 horas</strong> (<code>TETO_OFFLINE_HORAS</code>). Compare
+      <strong>8 h</strong> com <strong>24 h</strong>: se o balde cheio depois de um dia
+      inteiro fora não frustrar, o teto está calibrado. Se frustrar, ele é alto demais —
+      ou precisa aparecer na tela antes de o jogador sair.
+    </p>
+  </div>
+</div>
+
+<!-- Tela de veredito: o critério de morte, calculado sozinho -->
+<div class="tela" id="telaFim">
+  <div class="folha">
+    <h1>Critério de morte</h1>
+    <h2 id="fimTitulo">Resultado da sessão</h2>
+
+    <div class="veredito" id="fimVeredito">
+      <span class="rot">Veredito</span>
+      <p id="fimTexto"></p>
+    </div>
+
+    <table id="fimTabela"></table>
+
+    <button class="forte" id="btVerVolta">Ver a tela de volta</button>
+    <button id="btDeNovo">Rodar outra sessão</button>
+
+    <p class="nota">
+      A linha que decide é <strong>tabuleiros completados</strong>. Dez seguidos sem meta
+      nenhuma quer dizer que o núcleo se sustenta e a meta vai multiplicar. Parar antes
+      quer dizer que nenhuma economia salva — e custou uma tarde descobrir, não dois meses.
+      O alvo de sessão do portal é <strong>10+ min</strong>.
+    </p>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════════════════════════════
+   Protótipo de duas telas — puzzle de organização por cor + meta idle.
+   Tudo desenhado com retângulo, sem asset nenhum, pra que o porte
+   pro Godot (desenho.gd / draw_rect) seja mecânico.
+   ══════════════════════════════════════════════════════════════════ */
+
+const CONFIG = {
+  CORES: 6,            // cores em jogo
+  CAPACIDADE: 4,       // camadas por recipiente
+  VAZIOS: 2,           // recipientes livres
+  TABULEIROS_ALVO: 10, // o critério de morte
+  MOEDA_BASE: 100,
+  MOEDA_POR_MOVIMENTO_POUPADO: 25,
+  TETO_OFFLINE_HORAS: 8,
+  PRODUCAO_POR_MIN: 12,
+};
+
+// As únicas cores da tela. Espalhadas em matiz e em valor, pra
+// diferenciarem também em preto e branco.
+const TINTAS = [
+  "#d93a2b", "#ef8f2a", "#e0c53a", "#3fa65a",
+  "#2f7fd4", "#8b4fc4", "#23b3ad", "#d95f9a",
+];
+
+/* ─────────────── estado ─────────────── */
+
+const jogo = {
+  tubos: [],
+  par: 0,
+  movimentos: 0,
+  selecionado: -1,
+  historico: [],
+  animando: false,
+  inicioTabuleiro: 0,
+  travado: false,
+};
+
+const sessao = {
+  tabuleiro: 1,
+  completados: 0,
+  inicio: 0,
+  tempos: [],
+  movimentos: [],
+  pares: [],
+  desfazer: 0,
+  reinicios: 0,
+  moedas: 0,
+  encerrada: false,
+};
+
+/* ─────────────── regras do tabuleiro ─────────────── */
+
+// Comprimento da sequência de topo de mesma cor.
+function corrida(tubo) {
+  if (!tubo.length) return 0;
+  const c = tubo[tubo.length - 1];
+  let n = 1;
+  while (n < tubo.length && tubo[tubo.length - 1 - n] === c) n++;
+  return n;
+}
+
+function podeDespejar(tubos, de, para) {
+  if (de === para) return false;
+  const o = tubos[de], d = tubos[para];
+  if (!o.length) return false;
+  if (d.length >= CONFIG.CAPACIDADE) return false;
+  if (d.length && d[d.length - 1] !== o[o.length - 1]) return false;
+  // Mover um recipiente já uniforme para um vazio não leva a lugar nenhum.
+  if (!d.length && o.length === corrida(o)) return false;
+  return true;
+}
+
+function despejar(tubos, de, para) {
+  const cor = tubos[de][tubos[de].length - 1];
+  const espaco = CONFIG.CAPACIDADE - tubos[para].length;
+  const n = Math.min(corrida(tubos[de]), espaco);
+  for (let i = 0; i < n; i++) { tubos[de].pop(); tubos[para].push(cor); }
+  return n;
+}
+
+function resolvido(tubos) {
+  return tubos.every(t =>
+    t.length === 0 || (t.length === CONFIG.CAPACIDADE && t.every(c => c === t[0]))
+  );
+}
+
+// Nenhum movimento legal disponível.
+function emprensado(tubos) {
+  for (let i = 0; i < tubos.length; i++)
+    for (let j = 0; j < tubos.length; j++)
+      if (podeDespejar(tubos, i, j)) return false;
+  return true;
+}
+
+/* ─────────────── o par, por IDA* ───────────────
+   Cada cor espalhada por N recipientes precisa de ao menos N-1
+   movimentos para se juntar, e um movimento reduz esse total em no
+   máximo 1 — então a soma é um limite inferior admissível. Com ele,
+   o IDA* devolve o mínimo de verdade, não um chute.               */
+
+function heuristica(tubos) {
+  const onde = new Map();
+  tubos.forEach((t, i) => {
+    for (const c of new Set(t)) {
+      if (!onde.has(c)) onde.set(c, new Set());
+      onde.get(c).add(i);
+    }
+  });
+  let h = 0;
+  for (const s of onde.values()) h += s.size - 1;
+  return h;
+}
+
+// Recipientes são intercambiáveis: ordenar canoniza o estado e corta
+// o espaço de busca em várias ordens de grandeza.
+function chave(tubos) {
+  return tubos.map(t => t.join(",")).sort().join("|");
+}
+
+// A* com fila de prioridade e tabela de estados canonizados. A primeira
+// versão usava IDA*, que aqui explodia: a profundidade fica em ~18 e as
+// transposições são tantas que sem tabela global a busca não termina.
+// Medido: mediana de 16 ms, pior caso 47 ms, ~1.000 nós.
+function calcularPar(inicial, tetoNos = 300000) {
+  const heap = [];
+  const empurrar = (f, g, t) => {
+    heap.push([f, g, t]);
+    let i = heap.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (heap[p][0] <= heap[i][0]) break;
+      [heap[p], heap[i]] = [heap[i], heap[p]];
+      i = p;
+    }
+  };
+  const tirar = () => {
+    const topo = heap[0], ultimo = heap.pop();
+    if (heap.length) {
+      heap[0] = ultimo;
+      let i = 0;
+      for (;;) {
+        const e = 2 * i + 1, d = e + 1;
+        let m = i;
+        if (e < heap.length && heap[e][0] < heap[m][0]) m = e;
+        if (d < heap.length && heap[d][0] < heap[m][0]) m = d;
+        if (m === i) break;
+        [heap[m], heap[i]] = [heap[i], heap[m]];
+        i = m;
+      }
+    }
+    return topo;
+  };
+
+  const melhor = new Map([[chave(inicial), 0]]);
+  empurrar(heuristica(inicial), 0, inicial);
+  let nos = 0;
+
+  while (heap.length) {
+    const [, g, tubos] = tirar();
+    if (resolvido(tubos)) return { par: g, exato: true };
+    if (++nos > tetoNos) return { par: g, exato: false };
+    if (melhor.get(chave(tubos)) < g) continue;
+
+    for (let i = 0; i < tubos.length; i++) {
+      for (let j = 0; j < tubos.length; j++) {
+        if (!podeDespejar(tubos, i, j)) continue;
+        const copia = tubos.map(t => t.slice());
+        despejar(copia, i, j);
+        const k = chave(copia), g2 = g + 1, ant = melhor.get(k);
+        if (ant !== undefined && ant <= g2) continue;
+        melhor.set(k, g2);
+        empurrar(g2 + heuristica(copia), g2, copia);
+      }
+    }
+  }
+  return { par: -1, exato: false };   // insolúvel
+}
+
+/* ─────────────── geração ───────────────
+   Distribuição aleatória + verificação por solver. É mais honesto que
+   embaralhar a partir do resolvido: aquele caminho garante que existe
+   solução, mas o comprimento do embaralhamento é só um limite
+   superior, não o par. Aqui o par sai do próprio solver.           */
+
+function distribuir() {
+  const unidades = [];
+  for (let c = 0; c < CONFIG.CORES; c++)
+    for (let k = 0; k < CONFIG.CAPACIDADE; k++) unidades.push(c);
+  for (let i = unidades.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [unidades[i], unidades[j]] = [unidades[j], unidades[i]];
+  }
+  const tubos = [];
+  for (let i = 0; i < CONFIG.CORES; i++)
+    tubos.push(unidades.slice(i * CONFIG.CAPACIDADE, (i + 1) * CONFIG.CAPACIDADE));
+  for (let i = 0; i < CONFIG.VAZIOS; i++) tubos.push([]);
+  return tubos;
+}
+
+function gerar() {
+  let reserva = null;
+  // Medido em 50 amostras com 6 cores: par entre 14 e 21, média 17,8, e
+  // nenhuma distribuição insolúvel (com 2 recipientes livres é raríssimo).
+  // O filtro só descarta o tabuleiro fácil demais.
+  const PISO = CONFIG.CORES * 2 + 1;
+  for (let tentativa = 0; tentativa < 12; tentativa++) {
+    const tubos = distribuir();
+    if (resolvido(tubos)) continue;
+    const { par, exato } = calcularPar(tubos);
+    if (par < 0) continue;                       // insolúvel
+    if (!reserva) reserva = { tubos, par, exato };
+    if (exato && par >= PISO) return { tubos, par };
+  }
+  return reserva || { tubos: distribuir(), par: 0 };
+}
+
+/* ─────────────── desenho ─────────────── */
+
+const cv = document.getElementById("tela");
+const ctx = cv.getContext("2d");
+let layout = null;
+
+function corDe(nome) {
+  return getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+}
+
+function medir() {
+  const palco = cv.parentElement;
+  const larguraDisp = palco.clientWidth - 16;
+  const alturaDisp = Math.max(220, palco.clientHeight - 8);
+
+  const n = jogo.tubos.length;
+  const colunas = n <= 8 ? Math.ceil(n / 2) : Math.ceil(n / 2);
+  const linhas = Math.ceil(n / colunas);
+
+  // O recipiente é um retângulo alto: largura em função da coluna,
+  // altura em função da capacidade.
+  let larguraTubo = Math.min(58, (larguraDisp - (colunas + 1) * 12) / colunas);
+  let alturaCamada = Math.min(30, (alturaDisp - (linhas + 1) * 26) / (linhas * CONFIG.CAPACIDADE));
+  larguraTubo = Math.max(30, larguraTubo);
+  alturaCamada = Math.max(16, alturaCamada);
+
+  const alturaTubo = alturaCamada * CONFIG.CAPACIDADE;
+  const gapX = 12, gapY = 26;
+  const largura = colunas * larguraTubo + (colunas + 1) * gapX;
+  const altura = linhas * alturaTubo + (linhas + 1) * gapY;
+
+  layout = { colunas, linhas, larguraTubo, alturaCamada, alturaTubo, gapX, gapY, largura, altura };
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = largura * dpr;
+  cv.height = altura * dpr;
+  cv.style.width = largura + "px";
+  cv.style.height = altura + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function posTubo(i) {
+  const L = layout;
+  const col = i % L.colunas;
+  const lin = Math.floor(i / L.colunas);
+  return {
+    x: L.gapX + col * (L.larguraTubo + L.gapX),
+    y: L.gapY + lin * (L.alturaTubo + L.gapY),
+  };
+}
+
+function desenhar() {
+  if (!layout) return;
+  const L = layout;
+  ctx.clearRect(0, 0, L.largura, L.altura);
+
+  const vidro = corDe("--vidro");
+  const linha = corDe("--vidro-linha");
+  const selec = corDe("--selecao");
+
+  jogo.tubos.forEach((tubo, i) => {
+    const { x, y } = posTubo(i);
+    const sel = jogo.selecionado === i;
+
+    // o vidro
+    ctx.fillStyle = vidro;
+    ctx.fillRect(x, y, L.larguraTubo, L.alturaTubo);
+
+    // o líquido, de baixo pra cima
+    tubo.forEach((cor, nivel) => {
+      const erguida = sel && nivel >= tubo.length - corrida(tubo);
+      const cy = y + L.alturaTubo - (nivel + 1) * L.alturaCamada - (erguida ? 6 : 0);
+      ctx.fillStyle = TINTAS[cor];
+      ctx.fillRect(x + 2, cy + 1, L.larguraTubo - 4, L.alturaCamada - 2);
+    });
+
+    // a borda
+    ctx.strokeStyle = sel ? selec : linha;
+    ctx.lineWidth = sel ? 2 : 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, L.larguraTubo - 1, L.alturaTubo - 1);
+  });
+}
+
+function tuboEm(px, py) {
+  const L = layout;
+  for (let i = 0; i < jogo.tubos.length; i++) {
+    const { x, y } = posTubo(i);
+    // alvo generoso: o gap conta como parte do recipiente, pro dedo
+    if (px >= x - L.gapX / 2 && px <= x + L.larguraTubo + L.gapX / 2 &&
+        py >= y - L.gapY / 2 && py <= y + L.alturaTubo + L.gapY / 2) return i;
+  }
+  return -1;
+}
+
+/* ─────────────── interação ─────────────── */
+
+function toque(ev) {
+  if (jogo.travado || sessao.encerrada) return;
+  const r = cv.getBoundingClientRect();
+  const pt = ev.changedTouches ? ev.changedTouches[0] : ev;
+  const i = tuboEm(pt.clientX - r.left, pt.clientY - r.top);
+  if (i < 0) return;
+  ev.preventDefault();
+
+  if (jogo.selecionado === -1) {
+    if (jogo.tubos[i].length) { jogo.selecionado = i; desenhar(); }
+    return;
+  }
+  if (jogo.selecionado === i) { jogo.selecionado = -1; desenhar(); return; }
+
+  if (podeDespejar(jogo.tubos, jogo.selecionado, i)) {
+    jogo.historico.push(jogo.tubos.map(t => t.slice()));
+    despejar(jogo.tubos, jogo.selecionado, i);
+    jogo.movimentos++;
+    jogo.selecionado = -1;
+    atualizarHud();
+    desenhar();
+    if (resolvido(jogo.tubos)) concluir();
+  } else {
+    // destino inválido: troca a seleção em vez de não fazer nada
+    jogo.selecionado = jogo.tubos[i].length ? i : -1;
+    desenhar();
+  }
+}
+
+cv.addEventListener("pointerdown", toque);
+
+/* ─────────────── ciclo de tabuleiro ─────────────── */
+
+function novoTabuleiro() {
+  const { tubos, par } = gerar();
+  jogo.tubos = tubos;
+  jogo.par = par;
+  jogo.movimentos = 0;
+  jogo.selecionado = -1;
+  jogo.historico = [];
+  jogo.travado = false;
+  jogo.inicioTabuleiro = performance.now();
+  if (!sessao.inicio) sessao.inicio = performance.now();
+  medir();
+  desenhar();
+  atualizarHud();
+}
+
+function concluir() {
+  jogo.travado = true;
+  const seg = (performance.now() - jogo.inicioTabuleiro) / 1000;
+  sessao.completados++;
+  sessao.tempos.push(seg);
+  sessao.movimentos.push(jogo.movimentos);
+  sessao.pares.push(jogo.par);
+  sessao.moedas += CONFIG.MOEDA_BASE +
+    CONFIG.MOEDA_POR_MOVIMENTO_POUPADO * Math.max(0, jogo.par - jogo.movimentos);
+
+  if (sessao.completados >= CONFIG.TABULEIROS_ALVO) { setTimeout(encerrar, 450); return; }
+  sessao.tabuleiro++;
+  setTimeout(novoTabuleiro, 450);
+}
+
+function atualizarHud() {
+  document.getElementById("hudTab").innerHTML =
+    sessao.tabuleiro + "<small>/" + CONFIG.TABULEIROS_ALVO + "</small>";
+  const mv = document.getElementById("hudMov");
+  mv.textContent = jogo.movimentos;
+  mv.className = "val" + (jogo.movimentos > jogo.par ? " ruim"
+                        : jogo.movimentos && jogo.movimentos <= jogo.par ? " bom" : "");
+  document.getElementById("hudPar").textContent = jogo.par || "—";
+  document.getElementById("btDesfazer").disabled = !jogo.historico.length || jogo.travado;
+
+  // Medido: 9 em 200 partidas aleatórias chegam a beco sem saída. Um humano
+  // cai nisso bem menos, mas travado sem aviso ele acha que é bug — e o
+  // playtest passa a medir a confusão em vez do jogo.
+  const preso = !jogo.travado && emprensado(jogo.tubos);
+  const bt = document.getElementById("btReiniciar");
+  bt.textContent = preso ? "Sem saída — reiniciar" : "Reiniciar";
+  bt.classList.toggle("forte", preso);
+}
+
+setInterval(() => {
+  if (!sessao.inicio || sessao.encerrada) return;
+  const s = Math.floor((performance.now() - sessao.inicio) / 1000);
+  document.getElementById("hudTempo").textContent =
+    Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}, 500);
+
+/* ─────────────── ações ─────────────── */
+
+document.getElementById("btDesfazer").onclick = () => {
+  if (!jogo.historico.length || jogo.travado) return;
+  jogo.tubos = jogo.historico.pop();
+  jogo.movimentos = Math.max(0, jogo.movimentos - 1);
+  jogo.selecionado = -1;
+  sessao.desfazer++;
+  atualizarHud();
+  desenhar();
+};
+
+document.getElementById("btReiniciar").onclick = () => {
+  if (sessao.encerrada) return;
+  sessao.reinicios++;
+  novoTabuleiro();
+};
+
+document.getElementById("btParei").onclick = () => {
+  if (!sessao.encerrada) encerrar();
+};
+
+/* ─────────────── tela 2: a volta ─────────────── */
+
+let horasFora = 8;
+let dobrado = false;
+
+function acumulo() {
+  const min = Math.min(horasFora, CONFIG.TETO_OFFLINE_HORAS) * 60;
+  return Math.round(min * CONFIG.PRODUCAO_POR_MIN) * (dobrado ? 2 : 1);
+}
+
+function pintarVolta() {
+  document.getElementById("voltaMoeda").textContent = acumulo().toLocaleString("pt-BR");
+  const noTeto = horasFora > CONFIG.TETO_OFFLINE_HORAS;
+  document.getElementById("voltaLinha").innerHTML = noTeto
+    ? "moedas acumuladas — <strong>teto de " + CONFIG.TETO_OFFLINE_HORAS +
+      " h atingido</strong>, as horas a mais não renderam nada"
+    : "moedas acumuladas em " + horasFora + " h" + (dobrado ? " — <strong>dobrado</strong>" : "");
+  document.getElementById("btDobrar").disabled = dobrado;
+  document.getElementById("btDobrar").textContent = dobrado
+    ? "✓ Dobrado" : "▶ Assistir e levar 2×";
+}
+
+document.getElementById("segsAusencia").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  horasFora = parseFloat(b.dataset.h);
+  dobrado = false;
+  [...e.currentTarget.children].forEach(x =>
+    x.setAttribute("aria-pressed", String(x === b)));
+  pintarVolta();
+};
+
+document.getElementById("btDobrar").onclick = () => { dobrado = true; pintarVolta(); };
+document.getElementById("btVoltarJogo").onclick = () => mostrar(null);
+document.getElementById("btVerVolta").onclick = () => mostrar("telaVolta");
+
+function mostrar(id) {
+  document.querySelectorAll(".tela").forEach(t => t.classList.toggle("on", t.id === id));
+  if (id === "telaVolta") pintarVolta();
+}
+
+/* ─────────────── tela 3: o veredito ─────────────── */
+
+function encerrar() {
+  sessao.encerrada = true;
+  jogo.travado = true;
+
+  const totalSeg = (performance.now() - sessao.inicio) / 1000;
+  const n = sessao.completados;
+  const medio = n ? sessao.tempos.reduce((a, b) => a + b, 0) / n : 0;
+  const somaMov = sessao.movimentos.reduce((a, b) => a + b, 0);
+  const somaPar = sessao.pares.reduce((a, b) => a + b, 0);
+  const eficiencia = somaPar ? somaMov / somaPar : 0;
+
+  const completou = n >= CONFIG.TABULEIROS_ALVO;
+  const sessaoBoa = totalSeg >= 600;
+  const ritmoBom = medio >= 45 && medio <= 110;
+
+  let classe, titulo, texto;
+  if (completou && sessaoBoa) {
+    classe = "passa"; titulo = "O núcleo se sustenta";
+    texto = "Dez tabuleiros seguidos e mais de 10 minutos, <strong>sem meta nenhuma</strong>. " +
+            "É o sinal de seguir: a economia vai multiplicar um loop que já prende. " +
+            "Próximo passo é o gerador e as três trilhas.";
+  } else if (completou) {
+    classe = "duvida"; titulo = "Prende, mas rápido demais";
+    texto = "Os dez tabuleiros saíram, só que em <strong>" + Math.round(totalSeg / 60) +
+            " min</strong> — abaixo dos 10 que o portal usa de referência. " +
+            "Pela conta das impressões isso vira ~4 por partida em vez de 6. " +
+            "Tabuleiro maior (7 ou 8 cores) antes de mexer em qualquer outra coisa.";
+  } else if (n >= 6) {
+    classe = "duvida"; titulo = "Quase";
+    texto = "Parou no " + n + "º de " + CONFIG.TABULEIROS_ALVO +
+            ". Não é morte, é aviso: o núcleo segura um punhado de tabuleiros e cansa. " +
+            "Vale uma segunda rodada antes de decidir — e olhar se o cansaço veio de " +
+            "repetição ou de dificuldade.";
+  } else {
+    classe = "morre"; titulo = "O núcleo não segura";
+    texto = "Parou no " + n + "º de " + CONFIG.TABULEIROS_ALVO +
+            ". Pelo critério escrito antes de começar, <strong>é pra matar</strong>. " +
+            "Nenhuma meta salva um núcleo chato — e custou uma tarde, não dois meses.";
+  }
+
+  document.getElementById("fimTitulo").textContent = titulo;
+  document.getElementById("fimVeredito").className = "veredito " + classe;
+  document.getElementById("fimTexto").innerHTML = texto;
+
+  const cls = (ok, meia) => ok ? "bom" : meia ? "atencao" : "ruim";
+  const linhas = [
+    ["Tabuleiros completados", n + " / " + CONFIG.TABULEIROS_ALVO, cls(completou, n >= 6)],
+    ["Tempo de sessão", Math.floor(totalSeg / 60) + ":" +
+      String(Math.floor(totalSeg % 60)).padStart(2, "0"), cls(sessaoBoa, totalSeg >= 300)],
+    ["Tempo médio por tabuleiro", medio.toFixed(0) + " s", cls(ritmoBom, medio > 20)],
+    ["Movimentos vs. par", somaPar ? (eficiencia * 100).toFixed(0) + " %" : "—",
+      cls(eficiencia > 0 && eficiencia <= 1.15, eficiencia <= 1.4)],
+    ["Desfazer usados", String(sessao.desfazer), "atencao"],
+    ["Reinícios", String(sessao.reinicios), cls(sessao.reinicios === 0, sessao.reinicios <= 2)],
+    ["Moedas ganhas", sessao.moedas.toLocaleString("pt-BR"), "atencao"],
+  ];
+  document.getElementById("fimTabela").innerHTML = linhas
+    .map(([r, v, c]) => `<tr><th>${r}</th><td class="${c}">${v}</td></tr>`).join("");
+
+  mostrar("telaFim");
+}
+
+document.getElementById("btDeNovo").onclick = () => {
+  Object.assign(sessao, {
+    tabuleiro: 1, completados: 0, inicio: 0, tempos: [], movimentos: [],
+    pares: [], desfazer: 0, reinicios: 0, moedas: 0, encerrada: false,
+  });
+  document.getElementById("hudTempo").textContent = "0:00";
+  mostrar(null);
+  novoTabuleiro();
+};
+
+/* ─────────────── partida ─────────────── */
+
+addEventListener("resize", () => { medir(); desenhar(); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", desenhar);
+novoTabuleiro();
+</script>
