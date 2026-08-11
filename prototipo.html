@@ -86,12 +86,12 @@
   /* ---- painel de instrumentos ---- */
   .hud {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     border-bottom: 1px solid var(--line);
     background: var(--panel);
   }
   .hud div {
-    padding: 10px 8px 11px;
+    padding: 10px 4px 11px;
     text-align: center;
     border-right: 1px solid var(--line);
   }
@@ -108,7 +108,7 @@
     display: block;
     font-family: var(--mono);
     font-variant-numeric: tabular-nums;
-    font-size: 19px;
+    font-size: clamp(14px, 4.4vw, 19px);
     line-height: 1;
     font-weight: 600;
   }
@@ -280,6 +280,7 @@
     <div><span class="rot">Movimentos</span><span class="val" id="hudMov">0</span></div>
     <div><span class="rot">Par</span><span class="val" id="hudPar">—</span></div>
     <div><span class="rot">Tempo</span><span class="val" id="hudTempo">0:00</span></div>
+    <div><span class="rot">Moedas</span><span class="val" id="hudMoeda">0</span></div>
   </div>
 
   <div class="palco"><canvas id="tela"></canvas></div>
@@ -371,6 +372,11 @@ const CONFIG = {
   MOEDA_BASE: 50,
   MOEDA_POR_FOLGA: 800, // × a folga proporcional; solução exata no par = 240
   TOLERANCIA_PAR: 1.3,  // acima de par × isto, só a base
+  MOEDA_INICIAL: 200,   // estoque de partida, senão não dá pra desfazer no 1º
+  // Um movimento a mais custa MOEDA_POR_FOLGA/par ≈ 44 moedas num par 18.
+  // Com o desfazer a 30, ele continua valendo a pena pro erro de verdade e
+  // deixa de ser busca gratuita pelo ótimo.
+  CUSTO_DESFAZER: 30,
   TETO_OFFLINE_HORAS: 8,
   PRODUCAO_POR_MIN: 12,
 };
@@ -410,7 +416,8 @@ const sessao = {
   pares: [],
   desfazer: 0,
   reinicios: 0,
-  moedas: 0,
+  ganho: 0,
+  gasto: 0,
   // Momento em que a pessoa DECLARA tédio, separado do momento em que para.
   // Existe porque um testador que já ouviu "o outro fez 17" persegue o 17: a
   // contagem final vira obediência, e só este marcador ainda mede tédio.
@@ -747,7 +754,7 @@ function concluir() {
   const folga = jogo.par > 0
     ? Math.max(0, CONFIG.TOLERANCIA_PAR - jogo.movimentos / jogo.par)
     : 0;
-  sessao.moedas += CONFIG.MOEDA_BASE + Math.round(CONFIG.MOEDA_POR_FOLGA * folga);
+  sessao.ganho += CONFIG.MOEDA_BASE + Math.round(CONFIG.MOEDA_POR_FOLGA * folga);
 
   // Sem cap. O alvo de 10 é o critério de morte, não o fim da sessão —
   // travar em 10 media "tempo para fazer 10", nunca "tempo de sessão".
@@ -756,7 +763,12 @@ function concluir() {
   setTimeout(novoTabuleiro, 450);
 }
 
+const saldo = () => CONFIG.MOEDA_INICIAL + sessao.ganho - sessao.gasto;
+
 function atualizarHud() {
+  const md = document.getElementById("hudMoeda");
+  md.textContent = saldo().toLocaleString("pt-BR");
+  md.className = "val" + (saldo() < CONFIG.CUSTO_DESFAZER ? " ruim" : "");
   // Passado o alvo, o contador para de mostrar a meta e vira um marcador de
   // quanto a pessoa aguentou — que é o que interessa daí pra frente.
   document.getElementById("hudTab").innerHTML = sessao.completados >= CONFIG.TABULEIROS_ALVO
@@ -767,7 +779,14 @@ function atualizarHud() {
   mv.className = "val" + (jogo.movimentos > jogo.par ? " ruim"
                         : jogo.movimentos && jogo.movimentos <= jogo.par ? " bom" : "");
   document.getElementById("hudPar").textContent = jogo.par || "—";
-  document.getElementById("btDesfazer").disabled = !jogo.historico.length || jogo.travado;
+  const bd = document.getElementById("btDesfazer");
+  const podePagar = saldo() >= CONFIG.CUSTO_DESFAZER;
+  bd.disabled = !jogo.historico.length || jogo.travado || !podePagar;
+  // O preço tem que estar no botão: cobrar por algo invisível não muda decisão
+  // nenhuma, só empobrece o jogador pelas costas.
+  bd.textContent = podePagar
+    ? "Desfazer −" + CONFIG.CUSTO_DESFAZER
+    : "Desfazer (sem saldo)";
 
   // Medido: 9 em 200 partidas aleatórias chegam a beco sem saída. Um humano
   // cai nisso bem menos, mas travado sem aviso ele acha que é bug — e o
@@ -789,6 +808,8 @@ setInterval(() => {
 
 document.getElementById("btDesfazer").onclick = () => {
   if (!jogo.historico.length || jogo.travado) return;
+  if (saldo() < CONFIG.CUSTO_DESFAZER) return;
+  sessao.gasto += CONFIG.CUSTO_DESFAZER;
   jogo.tubos = jogo.historico.pop();
   jogo.movimentos = Math.max(0, jogo.movimentos - 1);
   jogo.selecionado = -1;
@@ -934,7 +955,11 @@ function encerrar() {
       cls(esforco <= 1.15, esforco <= 1.4)]] : []),
     ["Desfazer usados", String(sessao.desfazer), "atencao"],
     ["Reinícios", String(sessao.reinicios), cls(sessao.reinicios === 0, sessao.reinicios <= 2)],
-    ["Moedas ganhas", sessao.moedas.toLocaleString("pt-BR"), "atencao"],
+    ["Moedas ganhas", sessao.ganho.toLocaleString("pt-BR"), "atencao"],
+    ...(sessao.gasto ? [["Gasto em desfazer", "−" + sessao.gasto.toLocaleString("pt-BR") +
+      "  (" + Math.round(100 * sessao.gasto / sessao.ganho) + " %)",
+      cls(sessao.gasto / sessao.ganho <= 0.15, sessao.gasto / sessao.ganho <= 0.3)]] : []),
+    ["Saldo final", saldo().toLocaleString("pt-BR"), "atencao"],
   ];
   document.getElementById("fimTabela").innerHTML = linhas
     .map(([r, v, c]) => `<tr><th>${r}</th><td class="${c}">${v}</td></tr>`).join("");
@@ -974,8 +999,8 @@ document.getElementById("btCopiar").onclick = async (e) => {
 document.getElementById("btDeNovo").onclick = () => {
   Object.assign(sessao, {
     tabuleiro: 1, completados: 0, inicio: 0, tempos: [], movimentos: [],
-    despejos: [], pares: [], desfazer: 0, reinicios: 0, moedas: 0, enjoou: null,
-    encerrada: false,
+    despejos: [], pares: [], desfazer: 0, reinicios: 0, ganho: 0, gasto: 0,
+    enjoou: null, encerrada: false,
   });
   const be = document.getElementById("btEnjoei");
   be.disabled = false;
