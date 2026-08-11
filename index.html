@@ -290,6 +290,17 @@
 
   <div class="loja">
     <button id="btMelhoria">Produção</button>
+    <!-- Comprar mudava só o texto do botão — nenhum sinal de que a compra fez
+         algo. Uma sessão gastou 104 (nível 2) sem nenhum retorno visível
+         durante o jogo, porque o único lugar que mostra produção é a tela de
+         volta, e ela só era alcançável pelo veredito no fim da sessão. -->
+    <p class="rot" id="statusProducao"
+       style="text-align:left; text-transform:none; letter-spacing:0; margin:6px 0 0"></p>
+    <button id="btPreverProducao"
+      style="margin-top:6px; font-size:11.5px; padding:7px; border-style:dashed;
+             color:var(--ink-dim); border-color:var(--line)">
+      Ver quanto renderia se eu saísse agora
+    </button>
   </div>
 
   <div class="marcador">
@@ -826,6 +837,13 @@ function atualizarHud() {
   const md = document.getElementById("hudMoeda");
   md.textContent = saldo().toLocaleString("pt-BR");
   md.className = "val" + (saldo() < CONFIG.CUSTO_DESFAZER ? " ruim" : "");
+
+  // A confirmação de que a compra fez algo, sem precisar sair do jogo.
+  document.getElementById("statusProducao").textContent = sessao.nivel > 0
+    ? "Nível " + sessao.nivel + " ativo: rende " +
+      (sessao.nivel * CONFIG.PRODUCAO_POR_HORA) + " moedas por hora ausente " +
+      "(teto " + CONFIG.TETO_OFFLINE_HORAS + " h) — o efeito é só quando você sai."
+    : "";
   // Passado o alvo, o contador para de mostrar a meta e vira um marcador de
   // quanto a pessoa aguentou — que é o que interessa daí pra frente.
   document.getElementById("hudTab").innerHTML = sessao.completados >= CONFIG.TABULEIROS_ALVO
@@ -951,6 +969,7 @@ document.getElementById("segsAusencia").onclick = (e) => {
 document.getElementById("btDobrar").onclick = () => { dobrado = true; pintarVolta(); };
 document.getElementById("btVoltarJogo").onclick = () => mostrar(null);
 document.getElementById("btVerVolta").onclick = () => mostrar("telaVolta");
+document.getElementById("btPreverProducao").onclick = () => mostrar("telaVolta");
 
 function mostrar(id) {
   document.querySelectorAll(".tela").forEach(t => t.classList.toggle("on", t.id === id));
