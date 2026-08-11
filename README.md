@@ -83,6 +83,45 @@ A última linha é a razão de o botão de reiniciar se anunciar sozinho quando 
 há movimento legal: um humano cai nisso bem menos que o acaso, mas travado sem
 aviso ele acha que é bug — e o playtest passa a medir a confusão em vez do jogo.
 
+## O playtest — 11/08/2026
+
+Duas sessões, com 6 cores:
+
+| | Autor | Segundo testador |
+| --- | --- | --- |
+| Tabuleiros | 10 / 10 | 10 / 10 |
+| Movimentos vs. par | 106 % | **110 %** |
+| Desfazer | 4 | **0** |
+| Reinícios | 0 | 0 |
+| Tempo por tabuleiro | 63 s | 35 s |
+
+**O núcleo passou.** Alguém que nunca tinha visto o jogo resolveu dez seguidos
+quase no ótimo matemático, sem desfazer uma única vez.
+
+O padrão entre as duas colunas é o achado: **o tempo variou quase o dobro, a
+precisão quase não mudou.** Dificuldade aqui não separa quem resolve de quem
+não resolve — separa quanto tempo leva. Mais cores vão alongar a partida, não
+causar desistência.
+
+### As duas coisas que o playtest quebrou
+
+**O bônus de moeda era código morto.** As duas sessões fecharam com exatamente
+1.000 moedas — 10 × `MOEDA_BASE`, zero de habilidade. A fórmula premiava
+`par - movimentos`, e como o par é o mínimo exato do A*, essa diferença nunca é
+positiva. Corrigido para premiar proximidade do par (`TOLERANCIA_PAR`); refeita
+a conta com os mesmos desempenhos, dá 2.100 e 1.700, com 76 % e 71 % vindos de
+habilidade.
+
+**O cap de dez tabuleiros media a coisa errada.** Os tempos de sessão das duas
+colunas (10:34 e 5:58) **não são tempo de sessão** — são tempo de cumprir uma
+cota de dez, porque o protótipo encerrava sozinho ali. Ninguém parou por tédio.
+O cap servia ao critério de morte e destruía a única outra métrica que importa.
+Removido: agora a sessão só acaba em "Parei aqui", e o contador vira marcador
+de quanto a pessoa aguentou.
+
+Por isso os dois tempos acima **não devem ser usados** para decidir número de
+cores. Esse número ainda não foi medido.
+
 ## O que ainda não está aqui
 
 De propósito, para não contaminar a medição: economia, trilhas de melhoria,
