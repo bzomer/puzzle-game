@@ -369,14 +369,19 @@ const CONFIG = {
   CAPACIDADE: 4,       // camadas por recipiente
   VAZIOS: 2,           // recipientes livres
   TABULEIROS_ALVO: 10, // o critério de morte — não é mais o fim da sessão
-  MOEDA_BASE: 50,
-  MOEDA_POR_FOLGA: 800, // × a folga proporcional; solução exata no par = 240
+  // Escala pequena de propósito. Com prêmios na casa das centenas, o custo do
+  // desfazer virava ruído: ninguém sente 30 sair de um saldo de 1.616. Aqui um
+  // tabuleiro vale de 3 a 18 e o desfazer custa 2 — dá pra fazer a conta de
+  // cabeça, que é a condição pra um preço mudar decisão.
+  MOEDA_BASE: 3,
+  MOEDA_POR_FOLGA: 50,  // × a folga proporcional; solução exata no par = 15
   TOLERANCIA_PAR: 1.3,  // acima de par × isto, só a base
-  MOEDA_INICIAL: 200,   // estoque de partida, senão não dá pra desfazer no 1º
-  // Um movimento a mais custa MOEDA_POR_FOLGA/par ≈ 44 moedas num par 18.
-  // Com o desfazer a 30, ele continua valendo a pena pro erro de verdade e
-  // deixa de ser busca gratuita pelo ótimo.
-  CUSTO_DESFAZER: 30,
+  MOEDA_INICIAL: 10,    // estoque de partida, senão não dá pra desfazer no 1º
+  // Um movimento a mais custa MOEDA_POR_FOLGA/par ≈ 2,8 num par 18. Com o
+  // desfazer a 2, ele continua valendo pro erro de verdade e deixa de valer
+  // como busca do ótimo na força bruta — a mesma calibração de antes, só que
+  // numa escala que cabe na cabeça.
+  CUSTO_DESFAZER: 2,
   TETO_OFFLINE_HORAS: 8,
   PRODUCAO_POR_MIN: 12,
 };
