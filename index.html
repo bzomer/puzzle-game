@@ -802,6 +802,18 @@ const saldo = () =>
 const custoMelhoria = () =>
   Math.round(CONFIG.CUSTO_MELHORIA * Math.pow(CONFIG.CUSTO_CRESCIMENTO, sessao.nivel));
 
+// Antes do primeiro tabuleiro completado NUNCA cobra. Sem isso, uma sequência
+// de desfazer no primeiro tabuleiro da sessão inteira drena o estoque inicial
+// e trava o jogador antes de ele ter ganhado uma moeda sequer — foi
+// exatamente o que aconteceu numa sessão real: 7 desfazer, 0 tabuleiros
+// completados, saldo zerado. O colchão de "2 grátis por tabuleiro" pressupõe
+// renda de tabuleiros anteriores; no primeiro tabuleiro da sessão essa renda
+// não existe, então o colchão sozinho não bastava.
+function custoDesfazerAtual() {
+  if (sessao.completados === 0) return 0;
+  return jogo.desfazerNoTabuleiro < CONFIG.DESFAZER_GRATIS ? 0 : CONFIG.CUSTO_DESFAZER;
+}
+
 function atualizarHud() {
   const bm = document.getElementById("btMelhoria");
   const custo = custoMelhoria();
@@ -825,16 +837,18 @@ function atualizarHud() {
                         : jogo.movimentos && jogo.movimentos <= jogo.par ? " bom" : "");
   document.getElementById("hudPar").textContent = jogo.par || "—";
   const bd = document.getElementById("btDesfazer");
-  const gratis = jogo.desfazerNoTabuleiro < CONFIG.DESFAZER_GRATIS;
-  const custoD = gratis ? 0 : CONFIG.CUSTO_DESFAZER;
+  const custoD = custoDesfazerAtual();
+  const gratis = custoD === 0;
   bd.disabled = !jogo.historico.length || jogo.travado || saldo() < custoD;
   // O preço tem que estar no botão: cobrar por algo invisível não muda decisão
   // nenhuma, só empobrece o jogador pelas costas.
-  bd.textContent = gratis
-    ? "Desfazer (" + (CONFIG.DESFAZER_GRATIS - jogo.desfazerNoTabuleiro) + " grátis)"
-    : saldo() >= CONFIG.CUSTO_DESFAZER
-      ? "Desfazer −" + CONFIG.CUSTO_DESFAZER
-      : "Desfazer (sem saldo)";
+  bd.textContent = sessao.completados === 0
+    ? "Desfazer (grátis até o 1º tabuleiro)"
+    : gratis
+      ? "Desfazer (" + (CONFIG.DESFAZER_GRATIS - jogo.desfazerNoTabuleiro) + " grátis)"
+      : saldo() >= CONFIG.CUSTO_DESFAZER
+        ? "Desfazer −" + CONFIG.CUSTO_DESFAZER
+        : "Desfazer (sem saldo)";
 
   // Medido: 9 em 200 partidas aleatórias chegam a beco sem saída. Um humano
   // cai nisso bem menos, mas travado sem aviso ele acha que é bug — e o
@@ -856,8 +870,7 @@ setInterval(() => {
 
 document.getElementById("btDesfazer").onclick = () => {
   if (!jogo.historico.length || jogo.travado) return;
-  const custoD = jogo.desfazerNoTabuleiro < CONFIG.DESFAZER_GRATIS
-    ? 0 : CONFIG.CUSTO_DESFAZER;
+  const custoD = custoDesfazerAtual();
   if (saldo() < custoD) return;
   sessao.gasto += custoD;
   jogo.desfazerNoTabuleiro++;
@@ -948,6 +961,16 @@ function mostrar(id) {
 
 function encerrar() {
   sessao.encerrada = true;
+  // Capturado ANTES de travar: se a sessão termina no meio de um tabuleiro,
+  // esse tabuleiro não entra nos arrays de sessao (só concluir() empurra
+  // neles) — sem isto, um quit no meio do primeiro tabuleiro não deixa
+  // NENHUM rastro do que estava acontecendo ali, e "foi difícil ou eu estava
+  // desatenta" vira pergunta sem resposta.
+  const abandonado = (!jogo.travado && jogo.par > 0) ? {
+    par: jogo.par, movimentos: jogo.movimentos, despejos: jogo.despejos,
+    desfazer: jogo.desfazerNoTabuleiro,
+    seg: (performance.now() - jogo.inicioTabuleiro) / 1000,
+  } : null;
   jogo.travado = true;
 
   const totalSeg = (performance.now() - sessao.inicio) / 1000;
@@ -968,6 +991,12 @@ function encerrar() {
   const parede = n >= 4 && medianaT > 0 && piorFim > 2.5 * medianaT;
 
   const completou = n >= CONFIG.TABULEIROS_ALVO;
+  // Bancarrota antes do primeiro tabuleiro: só existia como possibilidade
+  // antes da correção acima (sessao.completados === 0 agora nunca cobra), mas
+  // fica o diagnóstico pra sessões antigas e como rede de segurança.
+  const quebrouSemVitoria = n === 0 && (sessao.gasto + sessao.investido) > 0;
+  const quebrou = n >= 1 && !quebrouSemVitoria &&
+    saldo() < CONFIG.CUSTO_DESFAZER * 3 && (sessao.gasto + sessao.investido) > 0;
   // Havendo marcador de tédio, ELE é a sessão. O que veio depois é teimosia ou
   // cortesia, e não conta como engajamento.
   const segReal = sessao.enjoou ? sessao.enjoou.seg : totalSeg;
@@ -993,7 +1022,18 @@ function encerrar() {
             "abaixo dos 10 de referência. Pela conta das impressões isso vira ~4 por partida " +
             "em vez de 6. Agora sim vale alongar o tabuleiro (7 ou 8 cores): " +
             "desta vez o número é tempo de sessão de verdade, não tempo de cumprir uma cota.";
-  } else if (saldo() < CONFIG.CUSTO_DESFAZER * 3 && sessao.investido > 0) {
+  } else if (quebrouSemVitoria) {
+    classe = "duvida"; titulo = "Ficou sem saldo antes do 1º tabuleiro";
+    texto = "Parou sem completar nenhum tabuleiro, depois de gastar tudo em desfazer" +
+            (abandonado ? " no tabuleiro que estava jogando (par " + abandonado.par + ", " +
+              abandonado.movimentos + " movimento" + (abandonado.movimentos === 1 ? "" : "s") +
+              " tentado" + (abandonado.movimentos === 1 ? "" : "s") + " em " +
+              Math.round(abandonado.seg) + "s)" : "") +
+            ". <strong>Isto não testa se o núcleo prende</strong> — testa se a economia " +
+            "deixava alguém sem ferramenta antes de ganhar a primeira moeda, o que é um " +
+            "defeito da economia, não um veredito sobre o jogo. Corrigido: desfazer nunca " +
+            "cobra antes do primeiro tabuleiro completado. Vale rodar de novo.";
+  } else if (quebrou) {
     classe = "duvida"; titulo = "Quebrou, não enjoou";
     texto = "Parou no " + n + "º com <strong>saldo de " + saldo() + "</strong> — sem moeda " +
             "para praticamente nada. E não foi tédio nem dificuldade: a precisão ficou em " +
@@ -1032,6 +1072,8 @@ function encerrar() {
   const linhas = [
     ["Tabuleiros completados", completou ? String(n) + " (alvo 10 ✓)"
                                          : n + " / " + CONFIG.TABULEIROS_ALVO, cls(completou, n >= 6)],
+    ...(abandonado ? [["Tabuleiro abandonado", "par " + abandonado.par + ", " +
+      abandonado.movimentos + " mov., " + Math.round(abandonado.seg) + "s", "atencao"]] : []),
     ["Tempo de sessão", Math.floor(totalSeg / 60) + ":" +
       String(Math.floor(totalSeg % 60)).padStart(2, "0"),
       cls(totalSeg >= 600, totalSeg >= 300)],
@@ -1054,9 +1096,12 @@ function encerrar() {
     ["Moedas ganhas", sessao.ganho.toLocaleString("pt-BR"), "atencao"],
     ["Nível de produção", String(sessao.nivel), cls(sessao.nivel > 0, true)],
     ...(sessao.investido ? [["Investido em produção", "−" + sessao.investido, "atencao"]] : []),
-    ...(sessao.gasto ? [["Gasto em desfazer", "−" + sessao.gasto.toLocaleString("pt-BR") +
-      "  (" + Math.round(100 * sessao.gasto / sessao.ganho) + " %)",
-      cls(sessao.gasto / sessao.ganho <= 0.15, sessao.gasto / sessao.ganho <= 0.3)]] : []),
+    ...(sessao.gasto ? (() => {
+      const razao = sessao.ganho ? sessao.gasto / sessao.ganho : Infinity;
+      return [["Gasto em desfazer", "−" + sessao.gasto.toLocaleString("pt-BR") +
+        (isFinite(razao) ? "  (" + Math.round(100 * razao) + " %)" : "  (sem ganho ainda)"),
+        cls(razao <= 0.15, razao <= 0.3)]];
+    })() : []),
     ["Saldo final", saldo().toLocaleString("pt-BR"), "atencao"],
   ];
   document.getElementById("fimTabela").innerHTML = linhas
@@ -1066,6 +1111,9 @@ function encerrar() {
   // precisam chegar a alguém, é por aqui.
   resumo = "[" + titulo + "] " + CONFIG.CORES + " cores\n" +
     linhas.map(([r, v]) => r + ": " + v).join("\n") +
+    (abandonado ? "\nAbandonado: par " + abandonado.par + ", movimentos " +
+      abandonado.movimentos + ", despejos " + abandonado.despejos + ", desfazer " +
+      abandonado.desfazer + ", " + Math.round(abandonado.seg) + "s" : "") +
     "\nTempo por tabuleiro (s): " + sessao.tempos.map(t => t.toFixed(0)).join(", ") +
     "\nMovimentos: " + sessao.movimentos.join(", ") +
     "\nDespejos: " + sessao.despejos.join(", ") +
