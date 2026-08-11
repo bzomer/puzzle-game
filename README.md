@@ -92,7 +92,25 @@ fidelidade.
 
 ## Testar no celular
 
-`servir-na-rede.bat` serve esta pasta na rede local — o celular abre pelo
-Wi-Fi, sem publicar nada em lugar nenhum. É o mesmo padrão do
+Dois caminhos.
+
+**Na rede local**, sem publicar nada: `servir-na-rede.bat` serve esta pasta e o
+celular abre pelo Wi-Fi. É o mesmo padrão do
 [`06-modelos/testar-no-celular.bat`](../../06-modelos/testar-no-celular.bat),
 menos o export do Godot, que aqui não existe.
+
+**Pela internet**, em qualquer aparelho e sem login:
+[bzomer.github.io/puzzle-game](https://bzomer.github.io/puzzle-game/) — servido
+pelo GitHub Pages a partir de **[bzomer/puzzle-game](https://github.com/bzomer/puzzle-game)**,
+um repositório público separado.
+
+### Por que um repositório separado
+
+Este manual é privado, e sites do GitHub Pages são **públicos mesmo quando saem
+de um repositório privado**. Ligar o Pages aqui publicaria a pesquisa de
+monetização e a proposta do próximo jogo junto. O repositório separado leva só
+o protótipo — que não tem economia, nome nem marca — e o resto continua privado.
+
+> **Cuidado com a divergência.** O `index.html` de lá é uma cópia do
+> `prototipo.html` daqui. Ao mexer no protótipo, copie por cima e empurre nos
+> dois. Este aqui é a fonte.
