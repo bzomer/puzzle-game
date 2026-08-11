@@ -389,6 +389,12 @@ const CONFIG = {
   // como busca do ótimo na força bruta — a mesma calibração de antes, só que
   // numa escala que cabe na cabeça.
   CUSTO_DESFAZER: 2,
+  // Os primeiros de cada tabuleiro saem de graça. Sem isso o jogador quebrado
+  // perde a ferramenta justo quando precisa dela, e quebrar é fácil: uma
+  // sessão terminou com saldo 7 depois de 13 desfazer num tabuleiro que
+  // acabou abandonado. Preserva o anti-força-bruta (busca longa ainda paga) e
+  // remove a espiral de ficar sem saída por falta de caixa.
+  DESFAZER_GRATIS: 2,
   // A única melhoria comprável. Existe pra que a moeda tenha ralo: preço
   // cravado em moeda que não compra nada não dói em escala nenhuma, e foi o
   // que aconteceu nas duas primeiras sessões com desfazer pago.
@@ -411,6 +417,7 @@ const jogo = {
   tubos: [],
   par: 0,
   movimentos: 0,
+  desfazerNoTabuleiro: 0,
   // Despejos NUNCA decrementa. `movimentos` mede o tamanho da solução final;
   // este mede o esforço. Com 51 desfazer numa sessão, os dois divergiram 12
   // pontos percentuais — e sem separá-los a métrica muda de significado
@@ -751,6 +758,7 @@ function novoTabuleiro() {
   jogo.nos = nos || 0;
   jogo.movimentos = 0;
   jogo.despejos = 0;
+  jogo.desfazerNoTabuleiro = 0;
   jogo.selecionado = -1;
   jogo.historico = [];
   jogo.travado = false;
@@ -817,13 +825,16 @@ function atualizarHud() {
                         : jogo.movimentos && jogo.movimentos <= jogo.par ? " bom" : "");
   document.getElementById("hudPar").textContent = jogo.par || "—";
   const bd = document.getElementById("btDesfazer");
-  const podePagar = saldo() >= CONFIG.CUSTO_DESFAZER;
-  bd.disabled = !jogo.historico.length || jogo.travado || !podePagar;
+  const gratis = jogo.desfazerNoTabuleiro < CONFIG.DESFAZER_GRATIS;
+  const custoD = gratis ? 0 : CONFIG.CUSTO_DESFAZER;
+  bd.disabled = !jogo.historico.length || jogo.travado || saldo() < custoD;
   // O preço tem que estar no botão: cobrar por algo invisível não muda decisão
   // nenhuma, só empobrece o jogador pelas costas.
-  bd.textContent = podePagar
-    ? "Desfazer −" + CONFIG.CUSTO_DESFAZER
-    : "Desfazer (sem saldo)";
+  bd.textContent = gratis
+    ? "Desfazer (" + (CONFIG.DESFAZER_GRATIS - jogo.desfazerNoTabuleiro) + " grátis)"
+    : saldo() >= CONFIG.CUSTO_DESFAZER
+      ? "Desfazer −" + CONFIG.CUSTO_DESFAZER
+      : "Desfazer (sem saldo)";
 
   // Medido: 9 em 200 partidas aleatórias chegam a beco sem saída. Um humano
   // cai nisso bem menos, mas travado sem aviso ele acha que é bug — e o
@@ -845,8 +856,11 @@ setInterval(() => {
 
 document.getElementById("btDesfazer").onclick = () => {
   if (!jogo.historico.length || jogo.travado) return;
-  if (saldo() < CONFIG.CUSTO_DESFAZER) return;
-  sessao.gasto += CONFIG.CUSTO_DESFAZER;
+  const custoD = jogo.desfazerNoTabuleiro < CONFIG.DESFAZER_GRATIS
+    ? 0 : CONFIG.CUSTO_DESFAZER;
+  if (saldo() < custoD) return;
+  sessao.gasto += custoD;
+  jogo.desfazerNoTabuleiro++;
   jogo.tubos = jogo.historico.pop();
   jogo.movimentos = Math.max(0, jogo.movimentos - 1);
   jogo.selecionado = -1;
@@ -979,6 +993,15 @@ function encerrar() {
             "abaixo dos 10 de referência. Pela conta das impressões isso vira ~4 por partida " +
             "em vez de 6. Agora sim vale alongar o tabuleiro (7 ou 8 cores): " +
             "desta vez o número é tempo de sessão de verdade, não tempo de cumprir uma cota.";
+  } else if (saldo() < CONFIG.CUSTO_DESFAZER * 3 && sessao.investido > 0) {
+    classe = "duvida"; titulo = "Quebrou, não enjoou";
+    texto = "Parou no " + n + "º com <strong>saldo de " + saldo() + "</strong> — sem moeda " +
+            "para praticamente nada. E não foi tédio nem dificuldade: a precisão ficou em " +
+            (eficiencia * 100).toFixed(0) + " % e o pior tabuleiro em " +
+            (Math.max(...sessao.tempos) / medianaT).toFixed(1) + "× a mediana. " +
+            "<strong>Foi a economia que consumiu o caixa.</strong> Investir na produção é a " +
+            "decisão certa e este teste não consegue premiá-la — a passiva só paga na " +
+            "ausência, e numa sessão única não existe amanhã.";
   } else if (parede) {
     classe = "duvida"; titulo = "Bateu numa parede, não cansou";
     texto = "Parou no " + n + "º de " + CONFIG.TABULEIROS_ALVO + ", mas <strong>não foi " +
