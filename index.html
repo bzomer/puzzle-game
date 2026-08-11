@@ -253,6 +253,9 @@
     border-radius: 2px;
   }
 
+  .loja { padding: 8px 12px 0; background: var(--panel); }
+  .loja button { width: 100%; font-size: 12.5px; padding: 9px; }
+
   /* Instrumento de pesquisa, não controle de jogo — por isso destoa. */
   .marcador { padding: 0 12px 2px; background: var(--panel); }
   .marcador button {
@@ -284,6 +287,10 @@
   </div>
 
   <div class="palco"><canvas id="tela"></canvas></div>
+
+  <div class="loja">
+    <button id="btMelhoria">Produção</button>
+  </div>
 
   <div class="marcador">
     <button id="btEnjoei">Enjoei agora — marcar e continuar jogando</button>
@@ -382,8 +389,13 @@ const CONFIG = {
   // como busca do ótimo na força bruta — a mesma calibração de antes, só que
   // numa escala que cabe na cabeça.
   CUSTO_DESFAZER: 2,
+  // A única melhoria comprável. Existe pra que a moeda tenha ralo: preço
+  // cravado em moeda que não compra nada não dói em escala nenhuma, e foi o
+  // que aconteceu nas duas primeiras sessões com desfazer pago.
+  CUSTO_MELHORIA: 40,      // ~3 tabuleiros bons; 20 desfazer
+  CUSTO_CRESCIMENTO: 1.6,  // por nível
+  PRODUCAO_POR_HORA: 3,    // por nível, limitado pelo teto de horas
   TETO_OFFLINE_HORAS: 8,
-  PRODUCAO_POR_MIN: 12,
 };
 
 // As únicas cores da tela. Espalhadas em matiz e em valor, pra
@@ -423,7 +435,9 @@ const sessao = {
   desfazer: 0,
   reinicios: 0,
   ganho: 0,
-  gasto: 0,
+  gasto: 0,      // desfazer
+  investido: 0,  // melhorias
+  nivel: 0,
   // Momento em que a pessoa DECLARA tédio, separado do momento em que para.
   // Existe porque um testador que já ouviu "o outro fez 17" persegue o 17: a
   // contagem final vira obediência, e só este marcador ainda mede tédio.
@@ -774,9 +788,21 @@ function concluir() {
   setTimeout(novoTabuleiro, 450);
 }
 
-const saldo = () => CONFIG.MOEDA_INICIAL + sessao.ganho - sessao.gasto;
+const saldo = () =>
+  CONFIG.MOEDA_INICIAL + sessao.ganho - sessao.gasto - sessao.investido;
+
+const custoMelhoria = () =>
+  Math.round(CONFIG.CUSTO_MELHORIA * Math.pow(CONFIG.CUSTO_CRESCIMENTO, sessao.nivel));
 
 function atualizarHud() {
+  const bm = document.getElementById("btMelhoria");
+  const custo = custoMelhoria();
+  bm.disabled = saldo() < custo || sessao.encerrada;
+  bm.textContent = sessao.nivel === 0
+    ? "Comprar produção passiva — " + custo
+    : "Produção nível " + sessao.nivel + " (" +
+      sessao.nivel * CONFIG.PRODUCAO_POR_HORA + "/h) — subir por " + custo;
+
   const md = document.getElementById("hudMoeda");
   md.textContent = saldo().toLocaleString("pt-BR");
   md.className = "val" + (saldo() < CONFIG.CUSTO_DESFAZER ? " ruim" : "");
@@ -839,6 +865,14 @@ document.getElementById("btParei").onclick = () => {
   if (!sessao.encerrada) encerrar();
 };
 
+document.getElementById("btMelhoria").onclick = () => {
+  const custo = custoMelhoria();
+  if (sessao.encerrada || saldo() < custo) return;
+  sessao.investido += custo;
+  sessao.nivel++;
+  atualizarHud();
+};
+
 document.getElementById("btEnjoei").onclick = (e) => {
   if (sessao.enjoou || sessao.encerrada || !sessao.inicio) return;
   sessao.enjoou = {
@@ -855,18 +889,24 @@ let horasFora = 8;
 let dobrado = false;
 
 function acumulo() {
-  const min = Math.min(horasFora, CONFIG.TETO_OFFLINE_HORAS) * 60;
-  return Math.round(min * CONFIG.PRODUCAO_POR_MIN) * (dobrado ? 2 : 1);
+  const horas = Math.min(horasFora, CONFIG.TETO_OFFLINE_HORAS);
+  const base = sessao.nivel * CONFIG.PRODUCAO_POR_HORA * horas;
+  return Math.round(base) * (dobrado ? 2 : 1);
 }
 
 function pintarVolta() {
   document.getElementById("voltaMoeda").textContent = acumulo().toLocaleString("pt-BR");
   const noTeto = horasFora > CONFIG.TETO_OFFLINE_HORAS;
-  document.getElementById("voltaLinha").innerHTML = noTeto
-    ? "moedas acumuladas — <strong>teto de " + CONFIG.TETO_OFFLINE_HORAS +
-      " h atingido</strong>, as horas a mais não renderam nada"
-    : "moedas acumuladas em " + horasFora + " h" + (dobrado ? " — <strong>dobrado</strong>" : "");
-  document.getElementById("btDobrar").disabled = dobrado;
+  // Nível 0 rende zero, de propósito: a passiva só existe depois da primeira
+  // compra, e é assim que ela se ensina sozinha.
+  document.getElementById("voltaLinha").innerHTML = sessao.nivel === 0
+    ? "<strong>sem produção</strong> — a passiva só existe depois de comprar o primeiro nível"
+    : noTeto
+      ? "moedas acumuladas — <strong>teto de " + CONFIG.TETO_OFFLINE_HORAS +
+        " h atingido</strong>, as horas a mais não renderam nada"
+      : "moedas acumuladas em " + horasFora + " h no nível " + sessao.nivel +
+        (dobrado ? " — <strong>dobrado</strong>" : "");
+  document.getElementById("btDobrar").disabled = dobrado || sessao.nivel === 0;
   document.getElementById("btDobrar").textContent = dobrado
     ? "✓ Dobrado" : "▶ Assistir e levar 2×";
 }
@@ -989,6 +1029,8 @@ function encerrar() {
     ["Desfazer usados", String(sessao.desfazer), "atencao"],
     ["Reinícios", String(sessao.reinicios), cls(sessao.reinicios === 0, sessao.reinicios <= 2)],
     ["Moedas ganhas", sessao.ganho.toLocaleString("pt-BR"), "atencao"],
+    ["Nível de produção", String(sessao.nivel), cls(sessao.nivel > 0, true)],
+    ...(sessao.investido ? [["Investido em produção", "−" + sessao.investido, "atencao"]] : []),
     ...(sessao.gasto ? [["Gasto em desfazer", "−" + sessao.gasto.toLocaleString("pt-BR") +
       "  (" + Math.round(100 * sessao.gasto / sessao.ganho) + " %)",
       cls(sessao.gasto / sessao.ganho <= 0.15, sessao.gasto / sessao.ganho <= 0.3)]] : []),
@@ -1034,6 +1076,7 @@ document.getElementById("btDeNovo").onclick = () => {
   Object.assign(sessao, {
     tabuleiro: 1, completados: 0, inicio: 0, tempos: [], movimentos: [],
     despejos: [], nos: [], pares: [], desfazer: 0, reinicios: 0, ganho: 0, gasto: 0,
+    investido: 0, nivel: 0,
     enjoou: null, encerrada: false,
   });
   const be = document.getElementById("btEnjoei");
