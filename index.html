@@ -329,10 +329,11 @@
     <button id="btDeNovo">Rodar outra sessão</button>
 
     <p class="nota">
-      A linha que decide é <strong>tabuleiros completados</strong>. Dez seguidos sem meta
-      nenhuma quer dizer que o núcleo se sustenta e a meta vai multiplicar. Parar antes
-      quer dizer que nenhuma economia salva — e custou uma tarde descobrir, não dois meses.
-      O alvo de sessão do portal é <strong>10+ min</strong>.
+      Duas linhas decidem, e são independentes. <strong>Tabuleiros completados</strong>
+      diz se o núcleo se sustenta — dez seguidos, sem meta nenhuma, é o sinal de seguir.
+      <strong>Tempo de sessão</strong> só significa alguma coisa porque não há mais cota:
+      a sessão acaba quando você enjoa, então o número é tédio de verdade. O alvo do
+      portal é <strong>10+ min</strong>.
     </p>
   </div>
 </div>
@@ -435,11 +436,11 @@ function emprensado(tubos) {
   return true;
 }
 
-/* ─────────────── o par, por IDA* ───────────────
+/* ─────────────── o par, por A* ───────────────
    Cada cor espalhada por N recipientes precisa de ao menos N-1
    movimentos para se juntar, e um movimento reduz esse total em no
    máximo 1 — então a soma é um limite inferior admissível. Com ele,
-   o IDA* devolve o mínimo de verdade, não um chute.               */
+   a busca devolve o mínimo de verdade, não um chute.              */
 
 function heuristica(tubos) {
   const onde = new Map();
