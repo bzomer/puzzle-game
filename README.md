@@ -122,6 +122,36 @@ de quanto a pessoa aguentou.
 Por isso os dois tempos acima **não devem ser usados** para decidir número de
 cores. Esse número ainda não foi medido.
 
+## A terceira sessão — sem cota
+
+A primeira medição real de sessão, com o teste já sem limite de dez:
+
+| | |
+| --- | --- |
+| Tabuleiros | **17**, parando por vontade própria |
+| Tempo de sessão | **11:33** — acima dos 10 min de referência |
+| Tempo médio | 40 s |
+| Movimentos vs. par | 107 % |
+| Desfazer / reinícios | 1 / 0 |
+
+**O alvo de sessão está batido com 6 cores.** Some daqui a recomendação de subir
+para 7 ou 8: ela existia para consertar um número que, medido direito, não
+estava quebrado.
+
+Três leituras dos dados por tabuleiro:
+
+- **Foi tédio, não cansaço.** A precisão caiu de 105,5 % nos primeiros oito para
+  109,2 % nos últimos nove, enquanto o tempo por tabuleiro ficou parado (40,8 s
+  → 39,8 s). Quem cansa fica lento; quem enjoa fica desleixado.
+- **A dificuldade é plana, e provavelmente é o motivo de a sessão terminar.**
+  Dos 17 tabuleiros, **9 tiveram par exatamente 19**; desvio padrão de 1,87 num
+  intervalo de 14 a 21. Onze minutos sem nada mudar.
+- **O par está bem calibrado.** Três tabuleiros foram resolvidos **exatamente no
+  par** — o ótimo é atingível por um humano, não é um número decorativo.
+
+E a sessão derrubou a fórmula da moeda de novo — ver a nota de correção na
+[proposta](../../00-decisoes-de-partida/proposta-proximo-jogo.md#3-a-meta-e-a-economia).
+
 ## O que ainda não está aqui
 
 De propósito, para não contaminar a medição: economia, trilhas de melhoria,
