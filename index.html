@@ -413,6 +413,7 @@ const sessao = {
   tempos: [],
   movimentos: [],
   despejos: [],
+  nos: [],
   pares: [],
   desfazer: 0,
   reinicios: 0,
@@ -534,8 +535,8 @@ function calcularPar(inicial, tetoNos = 300000) {
 
   while (heap.length) {
     const [, g, tubos] = tirar();
-    if (resolvido(tubos)) return { par: g, exato: true };
-    if (++nos > tetoNos) return { par: g, exato: false };
+    if (resolvido(tubos)) return { par: g, exato: true, nos };
+    if (++nos > tetoNos) return { par: g, exato: false, nos };
     if (melhor.get(chave(tubos)) < g) continue;
 
     for (let i = 0; i < tubos.length; i++) {
@@ -583,12 +584,12 @@ function gerar() {
   for (let tentativa = 0; tentativa < 12; tentativa++) {
     const tubos = distribuir();
     if (resolvido(tubos)) continue;
-    const { par, exato } = calcularPar(tubos);
+    const { par, exato, nos } = calcularPar(tubos);
     if (par < 0) continue;                       // insolúvel
-    if (!reserva) reserva = { tubos, par, exato };
-    if (exato && par >= PISO) return { tubos, par };
+    if (!reserva) reserva = { tubos, par, exato, nos };
+    if (exato && par >= PISO) return { tubos, par, nos };
   }
-  return reserva || { tubos: distribuir(), par: 0 };
+  return reserva || { tubos: distribuir(), par: 0, nos: 0 };
 }
 
 /* ─────────────── desenho ─────────────── */
@@ -722,9 +723,13 @@ cv.addEventListener("pointerdown", toque);
 /* ─────────────── ciclo de tabuleiro ─────────────── */
 
 function novoTabuleiro() {
-  const { tubos, par } = gerar();
+  const { tubos, par, nos } = gerar();
   jogo.tubos = tubos;
   jogo.par = par;
+  // Nós expandidos pelo A*: hipótese de que medem a dificuldade de BUSCA, que
+  // o par não mede. O tab. 8 da 5ª sessão tinha par 17 (abaixo da média) e
+  // levou 4x a mediana de tempo com 18 desfazer.
+  jogo.nos = nos || 0;
   jogo.movimentos = 0;
   jogo.despejos = 0;
   jogo.selecionado = -1;
@@ -744,6 +749,7 @@ function concluir() {
   sessao.tempos.push(seg);
   sessao.movimentos.push(jogo.movimentos);
   sessao.despejos.push(jogo.despejos);
+  sessao.nos.push(jogo.nos);
   sessao.pares.push(jogo.par);
 
   // Premiar proximidade do par, medida em PROPORÇÃO e não em movimentos
@@ -894,6 +900,14 @@ function encerrar() {
   const eficiencia = somaPar ? somaMov / somaPar : 0;
   const esforco = somaPar ? somaDesp / somaPar : 0;
 
+  // Parede != cansaço. Se os últimos tabuleiros custaram muito mais que a
+  // mediana, a sessão morreu num tabuleiro ruim, não no loop se esgotando —
+  // e mandar o desenvolvedor mexer no loop seria o conselho errado.
+  const ordT = [...sessao.tempos].sort((a, b) => a - b);
+  const medianaT = ordT.length ? ordT[Math.floor(ordT.length / 2)] : 0;
+  const piorFim = Math.max(0, ...sessao.tempos.slice(-2));
+  const parede = n >= 4 && medianaT > 0 && piorFim > 2.5 * medianaT;
+
   const completou = n >= CONFIG.TABULEIROS_ALVO;
   // Havendo marcador de tédio, ELE é a sessão. O que veio depois é teimosia ou
   // cortesia, e não conta como engajamento.
@@ -920,6 +934,15 @@ function encerrar() {
             "abaixo dos 10 de referência. Pela conta das impressões isso vira ~4 por partida " +
             "em vez de 6. Agora sim vale alongar o tabuleiro (7 ou 8 cores): " +
             "desta vez o número é tempo de sessão de verdade, não tempo de cumprir uma cota.";
+  } else if (parede) {
+    classe = "duvida"; titulo = "Bateu numa parede, não cansou";
+    texto = "Parou no " + n + "º de " + CONFIG.TABULEIROS_ALVO + ", mas <strong>não foi " +
+            "tédio</strong>: o pior dos últimos tabuleiros levou <strong>" +
+            (piorFim / medianaT).toFixed(1) + "×</strong> a mediana da sessão (" +
+            Math.round(piorFim) + "s contra " + Math.round(medianaT) + "s). Até ali o loop " +
+            "estava indo bem. Isso é <strong>variância de dificuldade</strong>, e mexer no " +
+            "loop seria consertar a coisa errada — o que precisa de conserto é o gerador, " +
+            "que entrega tabuleiros bem piores que o par deles sugere.";
   } else if (n >= 6) {
     classe = "duvida"; titulo = "Quase";
     texto = "Parou no " + n + "º de " + CONFIG.TABULEIROS_ALVO +
@@ -949,6 +972,11 @@ function encerrar() {
       String(Math.floor(sessao.enjoou.seg % 60)).padStart(2, "0") + ")",
       cls(sessaoBoa, segReal >= 300)]] : []),
     ["Tempo médio por tabuleiro", medio.toFixed(0) + " s", cls(ritmoBom, medio > 20)],
+    ...(n >= 4 ? [["Pior tabuleiro vs. mediana",
+      (Math.max(...sessao.tempos) / medianaT).toFixed(1) + "×  (" +
+      Math.round(Math.max(...sessao.tempos)) + "s)",
+      cls(Math.max(...sessao.tempos) <= 2 * medianaT,
+          Math.max(...sessao.tempos) <= 3 * medianaT)]] : []),
     ["Movimentos vs. par", somaPar ? (eficiencia * 100).toFixed(0) + " %" : "—",
       cls(eficiencia > 0 && eficiencia <= 1.15, eficiencia <= 1.4)],
     ...(sessao.desfazer ? [["Esforço (despejos vs. par)", (esforco * 100).toFixed(0) + " %",
@@ -971,6 +999,7 @@ function encerrar() {
     "\nTempo por tabuleiro (s): " + sessao.tempos.map(t => t.toFixed(0)).join(", ") +
     "\nMovimentos: " + sessao.movimentos.join(", ") +
     "\nDespejos: " + sessao.despejos.join(", ") +
+    "\nNós do solver: " + sessao.nos.join(", ") +
     "\nPar: " + sessao.pares.join(", ");
 
   mostrar("telaFim");
@@ -999,7 +1028,7 @@ document.getElementById("btCopiar").onclick = async (e) => {
 document.getElementById("btDeNovo").onclick = () => {
   Object.assign(sessao, {
     tabuleiro: 1, completados: 0, inicio: 0, tempos: [], movimentos: [],
-    despejos: [], pares: [], desfazer: 0, reinicios: 0, ganho: 0, gasto: 0,
+    despejos: [], nos: [], pares: [], desfazer: 0, reinicios: 0, ganho: 0, gasto: 0,
     enjoou: null, encerrada: false,
   });
   const be = document.getElementById("btEnjoei");
