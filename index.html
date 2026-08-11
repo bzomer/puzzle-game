@@ -388,6 +388,11 @@ const jogo = {
   tubos: [],
   par: 0,
   movimentos: 0,
+  // Despejos NUNCA decrementa. `movimentos` mede o tamanho da solução final;
+  // este mede o esforço. Com 51 desfazer numa sessão, os dois divergiram 12
+  // pontos percentuais — e sem separá-los a métrica muda de significado
+  // sozinha, conforme o estilo de quem joga.
+  despejos: 0,
   selecionado: -1,
   historico: [],
   animando: false,
@@ -401,6 +406,7 @@ const sessao = {
   inicio: 0,
   tempos: [],
   movimentos: [],
+  despejos: [],
   pares: [],
   desfazer: 0,
   reinicios: 0,
@@ -692,6 +698,7 @@ function toque(ev) {
     jogo.historico.push(jogo.tubos.map(t => t.slice()));
     despejar(jogo.tubos, jogo.selecionado, i);
     jogo.movimentos++;
+    jogo.despejos++;
     jogo.selecionado = -1;
     atualizarHud();
     desenhar();
@@ -712,6 +719,7 @@ function novoTabuleiro() {
   jogo.tubos = tubos;
   jogo.par = par;
   jogo.movimentos = 0;
+  jogo.despejos = 0;
   jogo.selecionado = -1;
   jogo.historico = [];
   jogo.travado = false;
@@ -728,6 +736,7 @@ function concluir() {
   sessao.completados++;
   sessao.tempos.push(seg);
   sessao.movimentos.push(jogo.movimentos);
+  sessao.despejos.push(jogo.despejos);
   sessao.pares.push(jogo.par);
 
   // Premiar proximidade do par, medida em PROPORÇÃO e não em movimentos
@@ -860,7 +869,9 @@ function encerrar() {
   const medio = n ? sessao.tempos.reduce((a, b) => a + b, 0) / n : 0;
   const somaMov = sessao.movimentos.reduce((a, b) => a + b, 0);
   const somaPar = sessao.pares.reduce((a, b) => a + b, 0);
+  const somaDesp = sessao.despejos.reduce((a, b) => a + b, 0);
   const eficiencia = somaPar ? somaMov / somaPar : 0;
+  const esforco = somaPar ? somaDesp / somaPar : 0;
 
   const completou = n >= CONFIG.TABULEIROS_ALVO;
   // Havendo marcador de tédio, ELE é a sessão. O que veio depois é teimosia ou
@@ -919,6 +930,8 @@ function encerrar() {
     ["Tempo médio por tabuleiro", medio.toFixed(0) + " s", cls(ritmoBom, medio > 20)],
     ["Movimentos vs. par", somaPar ? (eficiencia * 100).toFixed(0) + " %" : "—",
       cls(eficiencia > 0 && eficiencia <= 1.15, eficiencia <= 1.4)],
+    ...(sessao.desfazer ? [["Esforço (despejos vs. par)", (esforco * 100).toFixed(0) + " %",
+      cls(esforco <= 1.15, esforco <= 1.4)]] : []),
     ["Desfazer usados", String(sessao.desfazer), "atencao"],
     ["Reinícios", String(sessao.reinicios), cls(sessao.reinicios === 0, sessao.reinicios <= 2)],
     ["Moedas ganhas", sessao.moedas.toLocaleString("pt-BR"), "atencao"],
@@ -932,6 +945,7 @@ function encerrar() {
     linhas.map(([r, v]) => r + ": " + v).join("\n") +
     "\nTempo por tabuleiro (s): " + sessao.tempos.map(t => t.toFixed(0)).join(", ") +
     "\nMovimentos: " + sessao.movimentos.join(", ") +
+    "\nDespejos: " + sessao.despejos.join(", ") +
     "\nPar: " + sessao.pares.join(", ");
 
   mostrar("telaFim");
@@ -960,7 +974,8 @@ document.getElementById("btCopiar").onclick = async (e) => {
 document.getElementById("btDeNovo").onclick = () => {
   Object.assign(sessao, {
     tabuleiro: 1, completados: 0, inicio: 0, tempos: [], movimentos: [],
-    pares: [], desfazer: 0, reinicios: 0, moedas: 0, enjoou: null, encerrada: false,
+    despejos: [], pares: [], desfazer: 0, reinicios: 0, moedas: 0, enjoou: null,
+    encerrada: false,
   });
   const be = document.getElementById("btEnjoei");
   be.disabled = false;
