@@ -253,6 +253,18 @@
     border-radius: 2px;
   }
 
+  /* Instrumento de pesquisa, não controle de jogo — por isso destoa. */
+  .marcador { padding: 0 12px 2px; background: var(--panel); }
+  .marcador button {
+    width: 100%;
+    font-size: 11.5px;
+    padding: 7px;
+    color: var(--ink-dim);
+    border-style: dashed;
+    border-color: var(--line);
+  }
+  .marcador button:disabled { color: var(--bom); border-color: var(--bom); }
+
   .brecha { height: 4px; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -271,6 +283,10 @@
   </div>
 
   <div class="palco"><canvas id="tela"></canvas></div>
+
+  <div class="marcador">
+    <button id="btEnjoei">Enjoei agora — marcar e continuar jogando</button>
+  </div>
 
   <div class="acoes">
     <button id="btDesfazer" disabled>Desfazer</button>
@@ -389,6 +405,10 @@ const sessao = {
   desfazer: 0,
   reinicios: 0,
   moedas: 0,
+  // Momento em que a pessoa DECLARA tédio, separado do momento em que para.
+  // Existe porque um testador que já ouviu "o outro fez 17" persegue o 17: a
+  // contagem final vira obediência, e só este marcador ainda mede tédio.
+  enjoou: null,
   encerrada: false,
 };
 
@@ -778,6 +798,16 @@ document.getElementById("btParei").onclick = () => {
   if (!sessao.encerrada) encerrar();
 };
 
+document.getElementById("btEnjoei").onclick = (e) => {
+  if (sessao.enjoou || sessao.encerrada || !sessao.inicio) return;
+  sessao.enjoou = {
+    tabuleiro: sessao.completados + 1,
+    seg: (performance.now() - sessao.inicio) / 1000,
+  };
+  e.currentTarget.textContent = "✓ enjoou no " + sessao.enjoou.tabuleiro + "º — siga à vontade";
+  e.currentTarget.disabled = true;
+};
+
 /* ─────────────── tela 2: a volta ─────────────── */
 
 let horasFora = 8;
@@ -833,8 +863,16 @@ function encerrar() {
   const eficiencia = somaPar ? somaMov / somaPar : 0;
 
   const completou = n >= CONFIG.TABULEIROS_ALVO;
-  const sessaoBoa = totalSeg >= 600;
+  // Havendo marcador de tédio, ELE é a sessão. O que veio depois é teimosia ou
+  // cortesia, e não conta como engajamento.
+  const segReal = sessao.enjoou ? sessao.enjoou.seg : totalSeg;
+  const sessaoBoa = segReal >= 600;
   const ritmoBom = medio >= 45 && medio <= 110;
+  const marcador = sessao.enjoou
+    ? " Declarou tédio no <strong>" + sessao.enjoou.tabuleiro + "º</strong>, aos " +
+      Math.floor(sessao.enjoou.seg / 60) + " min, e seguiu jogando — <strong>vale o " +
+      "marcador, não onde parou</strong>."
+    : "";
 
   let classe, titulo, texto;
   if (completou && sessaoBoa) {
@@ -865,14 +903,19 @@ function encerrar() {
 
   document.getElementById("fimTitulo").textContent = titulo;
   document.getElementById("fimVeredito").className = "veredito " + classe;
-  document.getElementById("fimTexto").innerHTML = texto;
+  document.getElementById("fimTexto").innerHTML = texto + marcador;
 
   const cls = (ok, meia) => ok ? "bom" : meia ? "atencao" : "ruim";
   const linhas = [
     ["Tabuleiros completados", completou ? String(n) + " (alvo 10 ✓)"
                                          : n + " / " + CONFIG.TABULEIROS_ALVO, cls(completou, n >= 6)],
     ["Tempo de sessão", Math.floor(totalSeg / 60) + ":" +
-      String(Math.floor(totalSeg % 60)).padStart(2, "0"), cls(sessaoBoa, totalSeg >= 300)],
+      String(Math.floor(totalSeg % 60)).padStart(2, "0"),
+      cls(totalSeg >= 600, totalSeg >= 300)],
+    ...(sessao.enjoou ? [["Enjoou no tabuleiro", sessao.enjoou.tabuleiro + "  (" +
+      Math.floor(sessao.enjoou.seg / 60) + ":" +
+      String(Math.floor(sessao.enjoou.seg % 60)).padStart(2, "0") + ")",
+      cls(sessaoBoa, segReal >= 300)]] : []),
     ["Tempo médio por tabuleiro", medio.toFixed(0) + " s", cls(ritmoBom, medio > 20)],
     ["Movimentos vs. par", somaPar ? (eficiencia * 100).toFixed(0) + " %" : "—",
       cls(eficiencia > 0 && eficiencia <= 1.15, eficiencia <= 1.4)],
@@ -917,8 +960,11 @@ document.getElementById("btCopiar").onclick = async (e) => {
 document.getElementById("btDeNovo").onclick = () => {
   Object.assign(sessao, {
     tabuleiro: 1, completados: 0, inicio: 0, tempos: [], movimentos: [],
-    pares: [], desfazer: 0, reinicios: 0, moedas: 0, encerrada: false,
+    pares: [], desfazer: 0, reinicios: 0, moedas: 0, enjoou: null, encerrada: false,
   });
+  const be = document.getElementById("btEnjoei");
+  be.disabled = false;
+  be.textContent = "Enjoei agora — marcar e continuar jogando";
   document.getElementById("hudTempo").textContent = "0:00";
   mostrar(null);
   novoTabuleiro();
