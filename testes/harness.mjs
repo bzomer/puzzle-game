@@ -4,7 +4,7 @@
 //
 // Importa a lógica pura direto do prototipo.html (fonte única — se a lógica
 // mudar lá, os testes veem a mudança; não existe cópia pra divergir), roda
-// sete baterias e escreve testes/evidencias.md. Sai com código ≠ 0 se
+// as baterias e escreve testes/evidencias.md. Sai com código ≠ 0 se
 // qualquer asserção falhar, então serve de CI.
 
 import { readFileSync, writeFileSync } from "fs";
@@ -24,7 +24,7 @@ const codigo = puro.slice(0, corte) + `
 export { CONFIG, corrida, podeDespejar, despejar, resolvido, emprensado,
   heuristica, chave, calcularPar, distribuir, gerar, premioDoTabuleiro,
   custoDesfazerPuro, dentroDaTolerancia, serializar, jogadaDoBot,
-  medirDificuldade, faixaDoTabuleiro, gerarDirigido };`;
+  medirDificuldade, faixaDoTabuleiro, gerarDirigido, producaoAcumulada };`;
 const G = await import("data:text/javascript," + encodeURIComponent(codigo));
 
 // ── rng com semente (mulberry32): os números do relatório são reprodutíveis
@@ -342,6 +342,18 @@ diga("\n## 8. Regressões dos bugs achados em playtest");
     "acima da tolerância, só a base — bônus nunca negativo");
   const enc = G.serializar([[0, 1], [], [5, 5, 5, 5]]);
   afirma(enc === "01--5555", `serialização compacta dos layouts (deu "${enc}")`);
+}
+
+// ═══ 9. persistência: a conta da volta ══════════════════════════════════
+diga("\n## 9. Produção acumulada (a conta que traz a pessoa de volta)");
+{
+  const H = 3600000;
+  afirma(G.producaoAcumulada(3, 24 * H) === 72,
+    "teto de 8 h respeitado: 24 h fora no nível 3 rendem o mesmo que 8 h (72)");
+  afirma(G.producaoAcumulada(0, 8 * H) === 0, "nível 0 nunca produz — a compra se ensina sozinha");
+  afirma(G.producaoAcumulada(2, 0.5 * H) === 3, "meia hora no nível 2 rende 3 (produção é contínua, não por dia)");
+  afirma(G.producaoAcumulada(1, 8 * H) === 24, "bate com a tabela da proposta: nível 1, 8 h → 24");
+  afirma(G.producaoAcumulada(1, -5000) === 0, "relógio que anda pra trás não rende (clock skew)");
 }
 
 // ── fecho ───────────────────────────────────────────────────────────────

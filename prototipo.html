@@ -363,6 +363,7 @@
     <button class="forte" id="btVerVolta">Ver a tela de volta</button>
     <button id="btCopiar">Copiar os números</button>
     <button id="btDeNovo">Rodar outra sessão</button>
+    <button id="btZerar">Zerar tudo — apaga o progresso salvo</button>
 
     <p class="nota">
       Duas linhas decidem, e são independentes. <strong>Tabuleiros completados</strong>
@@ -673,6 +674,14 @@ function dentroDaTolerancia(par, movimentos) {
   return par > 0 && movimentos <= Math.round(par * CONFIG.TOLERANCIA_PAR);
 }
 
+// Produção offline de verdade: nível × taxa × horas fora, com o teto.
+// Pura de propósito — é a conta que decide se a pessoa tem motivo de voltar,
+// então ela mora no harness, não só no navegador.
+function producaoAcumulada(nivel, msFora) {
+  const horas = Math.min(Math.max(0, msFora) / 3600000, CONFIG.TETO_OFFLINE_HORAS);
+  return Math.round(nivel * CONFIG.PRODUCAO_POR_HORA * horas);
+}
+
 // Tabuleiro inicial como texto compacto — vai no resumo copiável, pra que
 // sessões humanas futuras carreguem os tabuleiros exatos e a validação
 // bot × humano possa ser direta, não por transitividade.
@@ -943,6 +952,7 @@ function concluir() {
   } else {
     sessao.sequencia = 0;
   }
+  salvar();
 
   // Sem cap. O alvo de 10 é o critério de morte, não o fim da sessão —
   // travar em 10 media "tempo para fazer 10", nunca "tempo de sessão".
@@ -951,8 +961,26 @@ function concluir() {
   setTimeout(novoTabuleiro, 450);
 }
 
-const saldo = () =>
-  CONFIG.MOEDA_INICIAL + sessao.ganho - sessao.gasto - sessao.investido;
+// O banco sobrevive ao fechamento da aba — sem isso, a pergunta central da
+// meta idle ("a pessoa volta?") era intestável: a produção passiva não
+// sobrevivia pra ninguém voltar PARA ela.
+let banco = CONFIG.MOEDA_INICIAL;
+let pendenteColeta = 0;
+
+const saldo = () => banco + sessao.ganho - sessao.gasto - sessao.investido;
+
+const CHAVE_SAVE = "sort-idle-v1";
+function salvar() {
+  try {
+    localStorage.setItem(CHAVE_SAVE, JSON.stringify({
+      banco: saldo(), nivel: sessao.nivel, quando: Date.now(),
+    }));
+  } catch { /* aba privada: o jogo segue, só não persiste */ }
+}
+function carregarSave() {
+  try { return JSON.parse(localStorage.getItem(CHAVE_SAVE) || "null"); }
+  catch { return null; }
+}
 
 const custoMelhoria = () =>
   Math.round(CONFIG.CUSTO_MELHORIA * Math.pow(CONFIG.CUSTO_CRESCIMENTO, sessao.nivel));
@@ -1068,6 +1096,7 @@ document.getElementById("btMelhoria").onclick = () => {
   if (sessao.encerrada || saldo() < custo) return;
   sessao.investido += custo;
   sessao.nivel++;
+  salvar();
   atualizarHud();
 };
 
@@ -1093,20 +1122,34 @@ function acumulo() {
 }
 
 function pintarVolta() {
-  document.getElementById("voltaMoeda").textContent = acumulo().toLocaleString("pt-BR");
+  const real = pendenteColeta > 0;
+  // No retorno real o simulador de ausência some: o número na tela é o que a
+  // ausência de verdade rendeu, não um cenário.
+  document.getElementById("segsAusencia").parentElement.style.display =
+    real ? "none" : "";
+  document.getElementById("voltaTitulo").textContent = real
+    ? "Enquanto você esteve fora — de verdade" : "Enquanto você esteve fora";
+  const valor = real ? pendenteColeta * (dobrado ? 2 : 1) : acumulo();
+  document.getElementById("voltaMoeda").textContent = valor.toLocaleString("pt-BR");
   const noTeto = horasFora > CONFIG.TETO_OFFLINE_HORAS;
   // Nível 0 rende zero, de propósito: a passiva só existe depois da primeira
   // compra, e é assim que ela se ensina sozinha.
-  document.getElementById("voltaLinha").innerHTML = sessao.nivel === 0
-    ? "<strong>sem produção</strong> — a passiva só existe depois de comprar o primeiro nível"
-    : noTeto
-      ? "moedas acumuladas — <strong>teto de " + CONFIG.TETO_OFFLINE_HORAS +
-        " h atingido</strong>, as horas a mais não renderam nada"
-      : "moedas acumuladas em " + horasFora + " h no nível " + sessao.nivel +
-        (dobrado ? " — <strong>dobrado</strong>" : "");
+  document.getElementById("voltaLinha").innerHTML = real
+    ? "moedas produzidas na sua ausência, nível " + sessao.nivel +
+      (dobrado ? " — <strong>dobrado</strong>" : "")
+    : sessao.nivel === 0
+      ? "<strong>sem produção</strong> — a passiva só existe depois de comprar o primeiro nível"
+      : noTeto
+        ? "moedas acumuladas — <strong>teto de " + CONFIG.TETO_OFFLINE_HORAS +
+          " h atingido</strong>, as horas a mais não renderam nada"
+        : "moedas acumuladas em " + horasFora + " h no nível " + sessao.nivel +
+          (dobrado ? " — <strong>dobrado</strong>" : "");
   document.getElementById("btDobrar").disabled = dobrado || sessao.nivel === 0;
   document.getElementById("btDobrar").textContent = dobrado
     ? "✓ Dobrado" : "▶ Assistir e levar 2×";
+  document.getElementById("btVoltarJogo").textContent = real
+    ? "Coletar " + valor.toLocaleString("pt-BR") + " e jogar"
+    : "Voltar ao tabuleiro";
 }
 
 document.getElementById("segsAusencia").onclick = (e) => {
@@ -1120,7 +1163,17 @@ document.getElementById("segsAusencia").onclick = (e) => {
 };
 
 document.getElementById("btDobrar").onclick = () => { dobrado = true; pintarVolta(); };
-document.getElementById("btVoltarJogo").onclick = () => mostrar(null);
+// no modo real o "dobrar" simula o rewarded de dobra — a coleta aplica o ×2
+document.getElementById("btVoltarJogo").onclick = () => {
+  if (pendenteColeta > 0) {
+    banco += pendenteColeta * (dobrado ? 2 : 1);
+    pendenteColeta = 0;
+    dobrado = false;
+    salvar();
+    atualizarHud();
+  }
+  mostrar(null);
+};
 document.getElementById("btVerVolta").onclick = () => mostrar("telaVolta");
 document.getElementById("btPreverProducao").onclick = () => mostrar("telaVolta");
 
@@ -1193,8 +1246,9 @@ function encerrar() {
     texto = "Os dez saíram — o núcleo passou. Mas a pessoa enjoou no <strong>" + n +
             "º</strong>, com <strong>" + Math.floor(totalSeg / 60) + " min</strong> de sessão, " +
             "abaixo dos 10 de referência. Pela conta das impressões isso vira ~4 por partida " +
-            "em vez de 6. Agora sim vale alongar o tabuleiro (7 ou 8 cores): " +
-            "desta vez o número é tempo de sessão de verdade, não tempo de cumprir uma cota.";
+            "em vez de 6. O botão de ajuste agora é o diretor: subir as FAIXAS " +
+            "do CONFIG serve tabuleiros mais duros sem mexer em mais nada — " +
+            "e desta vez o número é tempo de sessão de verdade, não cota.";
   } else if (quebrouSemVitoria) {
     classe = "duvida"; titulo = "Ficou sem saldo antes do 1º tabuleiro";
     texto = "Parou sem completar nenhum tabuleiro, depois de gastar tudo em desfazer" +
@@ -1338,9 +1392,35 @@ document.getElementById("btDeNovo").onclick = () => {
 
 /* ─────────────── partida ─────────────── */
 
+document.getElementById("btZerar").onclick = () => {
+  try { localStorage.removeItem(CHAVE_SAVE); } catch {}
+  banco = CONFIG.MOEDA_INICIAL;
+  sessao.nivel = 0;
+  pendenteColeta = 0;
+  document.getElementById("btDeNovo").click();
+};
+
 addEventListener("resize", () => { medir(); desenhar(); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", desenhar);
+
+// O celular mata aba sem avisar — salvar no "escondeu" é o único momento
+// garantido, não o fechamento.
+addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") salvar();
+});
+addEventListener("pagehide", salvar);
+
+const save = carregarSave();
+if (save && typeof save.banco === "number") {
+  banco = save.banco;
+  sessao.nivel = save.nivel || 0;
+  const fora = Date.now() - (save.quando || Date.now());
+  // Só mostra a volta se a ausência foi real (≥ 1 min) e rendeu algo —
+  // recarregar a página no meio do jogo não é "voltar".
+  if (fora >= 60000) pendenteColeta = producaoAcumulada(sessao.nivel, fora);
+}
 novoTabuleiro();
+if (pendenteColeta > 0) { dobrado = false; mostrar("telaVolta"); }
 </script>
 
 </body>

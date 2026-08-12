@@ -51,12 +51,17 @@ No topo do `<script>`, em `CONFIG` — o mesmo contrato do `config.gd` do manual
 
 ```js
 CORES: 6, CAPACIDADE: 4, VAZIOS: 2, TABULEIROS_ALVO: 10,
-MOEDA_BASE: 100, MOEDA_POR_MOVIMENTO_POUPADO: 25,
-TETO_OFFLINE_HORAS: 8, PRODUCAO_POR_MIN: 12,
+MOEDA_BASE: 3, MOEDA_POR_FOLGA: 50, TOLERANCIA_PAR: 1.3,
+MOEDA_INICIAL: 10, CUSTO_DESFAZER: 2, DESFAZER_GRATIS: 2,
+CUSTO_MELHORIA: 40, CUSTO_CRESCIMENTO: 1.6,
+PRODUCAO_POR_HORA: 3, TETO_OFFLINE_HORAS: 8,
+SEQUENCIA_BONUS: 0.1, SEQUENCIA_MAX: 2,
+FAIXAS: {...}, TETO_PAREDE: 1.7,
 ```
 
-**O primeiro botão a girar é `CORES`.** Se a sessão fechar rápido demais, 7 ou 8
-cores alongam o tabuleiro sem tocar em mais nada.
+**O primeiro botão a girar agora são as `FAIXAS` do diretor.** Se a sessão
+fechar rápido demais, subir as faixas serve tabuleiros mais duros sem tocar em
+mais nada — o número de cores deixou de ser o ajuste de primeira linha.
 
 ## O par é o mínimo de verdade
 
@@ -202,6 +207,20 @@ CI a cada push (`.github/workflows/testes.yml`). Oito baterias:
 O resumo copiável agora carrega **os layouts exatos servidos**, então as
 próximas sessões humanas permitem validar bot×humano diretamente, sem
 transitividade.
+
+## Persistência: a sessão em dois tempos ficou testável
+
+O protótipo agora **salva de verdade** (localStorage): banco de moedas, nível
+de produção e o instante da saída — gravado a cada tabuleiro, a cada compra e
+quando a aba se esconde, porque celular mata aba sem avisar. Ao voltar depois
+de ≥1 minuto de ausência real, a tela de volta abre **com o número que a
+ausência de verdade rendeu** (o simulador de ausência some nesse modo), com o
+"assista e dobre" valendo sobre a coleta real.
+
+Isso destrava o único teste que faltava e que nenhuma sessão única responde:
+**jogar, sair, voltar horas depois** — a pessoa volta *para* alguma coisa
+agora. O botão "Zerar tudo" no fim da sessão apaga o save, pra testar o
+primeiro contato de novo.
 
 ## O que ainda não está aqui
 
