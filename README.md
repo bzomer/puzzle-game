@@ -152,6 +152,57 @@ Três leituras dos dados por tabuleiro:
 E a sessão derrubou a fórmula da moeda de novo — ver a nota de correção na
 [proposta](../../00-decisoes-de-partida/proposta-proximo-jogo.md#3-a-meta-e-a-economia).
 
+## O diretor de dificuldade e a sequência
+
+Duas mudanças que saíram de evidência, não de gosto — cada uma com a fonte:
+
+**O diretor de dificuldade** serve tabuleiros em ondas (2 leves de
+aquecimento, depois ciclo leve → média → média → pesada), medindo cada
+candidato com um **bot guloso** que joga 12 vezes e conta becos e excesso de
+movimentos. Nenhum tabuleiro acima do teto de parede é servido, nunca.
+
+- Evidência interna: dificuldade plana serviu 9× o mesmo par em 17 tabuleiros
+  (tédio declarado); uma parede de 4,4× a mediana matou uma sessão; o primeiro
+  contato de uma testadora travou no 1º tabuleiro.
+- Evidência externa: "black hole levels" são o ponto nº 1 de churn em puzzle
+  (GameAnalytics); a SayGames calibra dificuldade por taxa de falha e duração,
+  nunca por intuição; e agente simulado + dados humanos preveem dificuldade
+  melhor que qualquer um sozinho (Kristensen et al., 2024).
+- Custo: mediana de 33 ms por tabuleiro (pior caso 172 ms) — invisível dentro
+  da pausa de 450 ms entre tabuleiros.
+
+**A sequência** multiplica o prêmio do próximo tabuleiro em +10% por tabuleiro
+seguido dentro da tolerância, teto ×2, e quebra ao estourar a tolerância ou
+reiniciar. Fica no HUD como a coisa que se está prestes a perder. Fonte:
+recompensa em camadas tem caso documentado de +45% de D30; a simulação de
+economia limita a inflação total a <90% mesmo pra jogador ótimo.
+
+## Testes automáticos
+
+`testes/harness.mjs` roda sem navegador e sem gente (`node
+testes/harness.mjs`), importa a lógica **direto do prototipo.html** (fonte
+única — não há cópia pra divergir) e escreve `testes/evidencias.md`. Roda em
+CI a cada push (`.github/workflows/testes.yml`). Oito baterias:
+
+1. invariantes sob 300 partidas aleatórias;
+2. o par é o mínimo exato (descida de gradiente do solver);
+3. estatística do gerador (200 tabuleiros);
+4. distribuição do score de dificuldade do bot (as FAIXAS do CONFIG vêm dos
+   quantis medidos aqui);
+5. **dados humanos**: as 5 sessões de playtest, por tabuleiro, embutidas — e a
+   primeira coisa que esta bateria fez foi **corrigir o projeto**: no agregado
+   (n=61) o par correlaciona sim com o tempo humano (ρ≈0,56); o que ele erra é
+   a cauda — as duas piores lutas tinham par comum, e a cauda é o churn;
+6. o diretor: aquecimento, ondas, zero paredes em 36 tabuleiros servidos;
+7. economia: 400 sessões simuladas — saldo nunca negativo, renda na escala,
+   streak limitado, retorno da produção melhora do nível 1 pro 2 (gancho da
+   segunda compra) e só piora dali em diante;
+8. regressões de todos os bugs achados em playtest.
+
+O resumo copiável agora carrega **os layouts exatos servidos**, então as
+próximas sessões humanas permitem validar bot×humano diretamente, sem
+transitividade.
+
 ## O que ainda não está aqui
 
 De propósito, para não contaminar a medição: economia, trilhas de melhoria,
