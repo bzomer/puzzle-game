@@ -86,7 +86,7 @@
   /* ---- painel de instrumentos ---- */
   .hud {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     border-bottom: 1px solid var(--line);
     background: var(--panel);
   }
@@ -284,6 +284,7 @@
     <div><span class="rot">Par</span><span class="val" id="hudPar">—</span></div>
     <div><span class="rot">Tempo</span><span class="val" id="hudTempo">0:00</span></div>
     <div><span class="rot">Moedas</span><span class="val" id="hudMoeda">0</span></div>
+    <div><span class="rot">Sequência</span><span class="val" id="hudSeq">—</span></div>
   </div>
 
   <div class="palco"><canvas id="tela"></canvas></div>
@@ -413,6 +414,24 @@ const CONFIG = {
   CUSTO_CRESCIMENTO: 1.6,  // por nível
   PRODUCAO_POR_HORA: 3,    // por nível, limitado pelo teto de horas
   TETO_OFFLINE_HORAS: 8,
+  // Sequência: tabuleiros seguidos dentro da tolerância aumentam o prêmio do
+  // PRÓXIMO em 10%, com teto ×2. Evidência: recompensa em camadas tem caso
+  // documentado de +45% de D30 (GameAnalytics), e a própria doc do portal —
+  // o jogador quer proteger o que já é dele. O teto mantém a renda limitada
+  // (verificado na simulação de economia do harness).
+  SEQUENCIA_BONUS: 0.1,
+  SEQUENCIA_MAX: 2,
+  // Faixas do diretor de dificuldade, sobre o score de medirDificuldade().
+  // Cortes vindos dos quantis medidos em testes/evidencias.md — não de chute.
+  FAIXAS: {
+    leve:   { min: 0.00, max: 0.45 },
+    media:  { min: 0.30, max: 1.00 },
+    pesada: { min: 0.80, max: 1.50 },
+  },
+  // Acima disto é "black hole level" — o ponto de churn nº 1 em puzzle
+  // (GameAnalytics), e o que matou uma sessão real aqui (parede de 4,4× a
+  // mediana). O diretor nunca serve um destes.
+  TETO_PAREDE: 1.7,
 };
 
 // As únicas cores da tela. Espalhadas em matiz e em valor, pra
@@ -456,6 +475,11 @@ const sessao = {
   gasto: 0,      // desfazer
   investido: 0,  // melhorias
   nivel: 0,
+  sequencia: 0,
+  maiorSequencia: 0,
+  layouts: [],
+  faixas: [],
+  scoresDif: [],
   // Momento em que a pessoa DECLARA tédio, separado do momento em que para.
   // Existe porque um testador que já ouviu "o outro fez 17" persegue o 17: a
   // contagem final vira obediência, e só este marcador ainda mede tédio.
@@ -597,12 +621,12 @@ function calcularPar(inicial, tetoNos = 300000) {
    solução, mas o comprimento do embaralhamento é só um limite
    superior, não o par. Aqui o par sai do próprio solver.           */
 
-function distribuir() {
+function distribuir(rng = Math.random) {
   const unidades = [];
   for (let c = 0; c < CONFIG.CORES; c++)
     for (let k = 0; k < CONFIG.CAPACIDADE; k++) unidades.push(c);
   for (let i = unidades.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [unidades[i], unidades[j]] = [unidades[j], unidades[i]];
   }
   const tubos = [];
@@ -612,22 +636,133 @@ function distribuir() {
   return tubos;
 }
 
-function gerar() {
+function gerar(rng = Math.random) {
   let reserva = null;
   // Medido em 50 amostras com 6 cores: par entre 14 e 21, média 17,8, e
   // nenhuma distribuição insolúvel (com 2 recipientes livres é raríssimo).
   // O filtro só descarta o tabuleiro fácil demais.
   const PISO = CONFIG.CORES * 2 + 1;
   for (let tentativa = 0; tentativa < 12; tentativa++) {
-    const tubos = distribuir();
+    const tubos = distribuir(rng);
     if (resolvido(tubos)) continue;
     const { par, exato, nos } = calcularPar(tubos);
     if (par < 0) continue;                       // insolúvel
     if (!reserva) reserva = { tubos, par, exato, nos };
     if (exato && par >= PISO) return { tubos, par, nos };
   }
-  return reserva || { tubos: distribuir(), par: 0, nos: 0 };
+  return reserva || { tubos: distribuir(rng), par: 0, nos: 0 };
 }
+
+/* ─────────────── prêmio, custos e sequência (puros) ─────────────── */
+
+function premioDoTabuleiro(par, movimentos, sequencia) {
+  const folga = par > 0
+    ? Math.max(0, CONFIG.TOLERANCIA_PAR - movimentos / par) : 0;
+  const base = CONFIG.MOEDA_BASE + Math.round(CONFIG.MOEDA_POR_FOLGA * folga);
+  const mult = Math.min(CONFIG.SEQUENCIA_MAX,
+    1 + CONFIG.SEQUENCIA_BONUS * (sequencia || 0));
+  return Math.round(base * mult);
+}
+
+function custoDesfazerPuro(completados, desfazerNoTabuleiro) {
+  if (completados === 0) return 0;
+  return desfazerNoTabuleiro < CONFIG.DESFAZER_GRATIS ? 0 : CONFIG.CUSTO_DESFAZER;
+}
+
+function dentroDaTolerancia(par, movimentos) {
+  return par > 0 && movimentos <= Math.round(par * CONFIG.TOLERANCIA_PAR);
+}
+
+// Tabuleiro inicial como texto compacto — vai no resumo copiável, pra que
+// sessões humanas futuras carreguem os tabuleiros exatos e a validação
+// bot × humano possa ser direta, não por transitividade.
+function serializar(tubos) {
+  return tubos.map(t => t.map(c => c.toString(36)).join("")).join("-");
+}
+
+/* ─────────────── bot e medição de dificuldade (puros) ───────────────
+   No agregado das sessões humanas o par correlaciona com o tempo (ρ≈0,56,
+   n=61 — ver testes/evidencias.md), mas erra exatamente a cauda: as duas
+   piores lutas (139s e 182s) tinham par comum. A cauda é o churn, e é o
+   que este bot guloso mede — taxa de beco + excesso de movimentos, jogando
+   cada candidato várias vezes. Referência: dados simulados + humanos
+   superam qualquer um sozinho na previsão de dificuldade (Kristensen et
+   al., 2024).                                                             */
+
+function jogadaDoBot(tubos, rng) {
+  const h0 = heuristica(tubos);
+  let melhores = [], melhorDelta = Infinity;
+  for (let i = 0; i < tubos.length; i++) {
+    for (let j = 0; j < tubos.length; j++) {
+      if (!podeDespejar(tubos, i, j)) continue;
+      const c = tubos.map(t => t.slice());
+      despejar(c, i, j);
+      const d = heuristica(c) - h0;
+      if (d < melhorDelta) { melhorDelta = d; melhores = [[i, j]]; }
+      else if (d === melhorDelta) melhores.push([i, j]);
+    }
+  }
+  if (!melhores.length) return null;
+  return melhores[Math.floor(rng() * melhores.length)];
+}
+
+function medirDificuldade(tubosIniciais, par, rodadas = 12, rng = Math.random) {
+  let becos = 0, resolvidos = 0, somaExcesso = 0;
+  const teto = Math.max(30, par * 3);
+  for (let r = 0; r < rodadas; r++) {
+    const tubos = tubosIniciais.map(t => t.slice());
+    let mov = 0;
+    while (mov < teto && !resolvido(tubos)) {
+      const jogada = jogadaDoBot(tubos, rng);
+      if (!jogada) { becos++; break; }
+      despejar(tubos, jogada[0], jogada[1]);
+      mov++;
+    }
+    if (resolvido(tubos)) { resolvidos++; somaExcesso += mov / par; }
+  }
+  const excesso = resolvidos ? somaExcesso / resolvidos : 3;
+  // 0 = o bot passeia; ~1 = o bot sofre; acima do TETO_PAREDE = buraco negro
+  const score = (1 - resolvidos / rodadas) * 1.5 + Math.max(0, excesso - 1);
+  return { score, taxaBeco: becos / rodadas,
+           taxaResolve: resolvidos / rodadas, excesso };
+}
+
+/* ─────────────── diretor de dificuldade (puro) ───────────────
+   Ondas em ciclo de 4, com aquecimento. Evidência interna: dificuldade
+   plana serviu 9× o mesmo par em 17 tabuleiros (tédio declarado); uma
+   parede matou outra sessão; e o primeiro contato de uma testadora travou
+   no 1º tabuleiro. Evidência externa: SayGames calibra dificuldade por
+   dados de falha/duração, nunca por intuição; o gênero sort vive de curva
+   gentil com picos, não de rampa constante.                              */
+
+function faixaDoTabuleiro(indice) {
+  if (indice < 2) return "leve";              // aquecimento
+  const fase = (indice - 2) % 4;
+  return fase === 3 ? "pesada" : fase === 0 ? "leve" : "media";
+}
+
+function gerarDirigido(indice, rng = Math.random) {
+  const faixa = faixaDoTabuleiro(indice);
+  const alvo = CONFIG.FAIXAS[faixa];
+  let reserva = null, reservaDist = Infinity, qualquer = null;
+  for (let tentativa = 0; tentativa < 10; tentativa++) {
+    const cand = gerar(rng);
+    if (cand.par <= 0) continue;
+    const dif = medirDificuldade(cand.tubos, cand.par, 12, rng);
+    const c = { ...cand, dificuldade: dif, faixa };
+    if (!qualquer) qualquer = c;
+    if (dif.score > CONFIG.TETO_PAREDE) continue;     // nunca servir parede
+    const d = dif.score < alvo.min ? alvo.min - dif.score
+            : dif.score > alvo.max ? dif.score - alvo.max : 0;
+    if (d === 0) return c;
+    if (d < reservaDist) { reservaDist = d; reserva = c; }
+  }
+  return reserva || qualquer;
+}
+
+/* ═══════════ FIM DA LÓGICA PURA — daqui pra baixo é DOM.
+   Os testes automáticos (testes/harness.mjs) importam só o que está acima
+   deste marcador; mover lógica pra baixo dele é tirá-la dos testes. ═══════ */
 
 /* ─────────────── desenho ─────────────── */
 
@@ -760,9 +895,13 @@ cv.addEventListener("pointerdown", toque);
 /* ─────────────── ciclo de tabuleiro ─────────────── */
 
 function novoTabuleiro() {
-  const { tubos, par, nos } = gerar();
-  jogo.tubos = tubos;
-  jogo.par = par;
+  const servido = gerarDirigido(sessao.completados);
+  jogo.tubos = servido.tubos;
+  jogo.par = servido.par;
+  jogo.faixa = servido.faixa || "?";
+  jogo.scoreDif = servido.dificuldade ? servido.dificuldade.score : -1;
+  jogo.layoutInicial = serializar(servido.tubos);
+  const nos = servido.nos;
   // Nós expandidos pelo A*: hipótese de que medem a dificuldade de BUSCA, que
   // o par não mede. O tab. 8 da 5ª sessão tinha par 17 (abaixo da média) e
   // levou 4x a mediana de tempo com 18 desfazer.
@@ -789,16 +928,21 @@ function concluir() {
   sessao.despejos.push(jogo.despejos);
   sessao.nos.push(jogo.nos);
   sessao.pares.push(jogo.par);
+  sessao.layouts.push(jogo.layoutInicial || "");
+  sessao.faixas.push(jogo.faixa || "?");
+  sessao.scoresDif.push(jogo.scoreDif >= 0 ? jogo.scoreDif.toFixed(2) : "?");
 
-  // Premiar proximidade do par, medida em PROPORÇÃO e não em movimentos
-  // absolutos. A versão absoluta pagava mais por tabuleiro difícil: no
-  // playtest de 17 tabuleiros, três soluções exatas no par renderam 290, 250
-  // e 250, e um tabuleiro jogado 3 acima do par empatou com outro jogado 1
-  // acima. O prêmio precisa ordenar qualidade de jogo, não tamanho do par.
-  const folga = jogo.par > 0
-    ? Math.max(0, CONFIG.TOLERANCIA_PAR - jogo.movimentos / jogo.par)
-    : 0;
-  sessao.ganho += CONFIG.MOEDA_BASE + Math.round(CONFIG.MOEDA_POR_FOLGA * folga);
+  // O prêmio é proporcional à proximidade do par (não a movimentos
+  // absolutos) e multiplicado pela sequência acumulada ANTES deste
+  // tabuleiro — cada tabuleiro seguido no ritmo aumenta o próximo em 10%,
+  // teto ×2. Fórmula pura em premioDoTabuleiro(), coberta pelo harness.
+  sessao.ganho += premioDoTabuleiro(jogo.par, jogo.movimentos, sessao.sequencia);
+  if (dentroDaTolerancia(jogo.par, jogo.movimentos)) {
+    sessao.sequencia++;
+    sessao.maiorSequencia = Math.max(sessao.maiorSequencia, sessao.sequencia);
+  } else {
+    sessao.sequencia = 0;
+  }
 
   // Sem cap. O alvo de 10 é o critério de morte, não o fim da sessão —
   // travar em 10 media "tempo para fazer 10", nunca "tempo de sessão".
@@ -821,8 +965,7 @@ const custoMelhoria = () =>
 // renda de tabuleiros anteriores; no primeiro tabuleiro da sessão essa renda
 // não existe, então o colchão sozinho não bastava.
 function custoDesfazerAtual() {
-  if (sessao.completados === 0) return 0;
-  return jogo.desfazerNoTabuleiro < CONFIG.DESFAZER_GRATIS ? 0 : CONFIG.CUSTO_DESFAZER;
+  return custoDesfazerPuro(sessao.completados, jogo.desfazerNoTabuleiro);
 }
 
 function atualizarHud() {
@@ -837,6 +980,15 @@ function atualizarHud() {
   const md = document.getElementById("hudMoeda");
   md.textContent = saldo().toLocaleString("pt-BR");
   md.className = "val" + (saldo() < CONFIG.CUSTO_DESFAZER ? " ruim" : "");
+
+  // O multiplicador mostrado é o que o PRÓXIMO tabuleiro paga — é a coisa
+  // que a pessoa está prestes a perder, que é onde mora a força do streak.
+  const sq = document.getElementById("hudSeq");
+  const multSeq = Math.min(CONFIG.SEQUENCIA_MAX,
+    1 + CONFIG.SEQUENCIA_BONUS * sessao.sequencia);
+  sq.textContent = sessao.sequencia > 0
+    ? sessao.sequencia + "×" + multSeq.toFixed(1).replace(".", ",") : "—";
+  sq.className = "val" + (sessao.sequencia >= 3 ? " bom" : "");
 
   // A confirmação de que a compra fez algo, sem precisar sair do jogo.
   document.getElementById("statusProducao").textContent = sessao.nivel > 0
@@ -903,6 +1055,7 @@ document.getElementById("btDesfazer").onclick = () => {
 document.getElementById("btReiniciar").onclick = () => {
   if (sessao.encerrada) return;
   sessao.reinicios++;
+  sessao.sequencia = 0;   // desistir do tabuleiro quebra a sequência
   novoTabuleiro();
 };
 
@@ -987,7 +1140,8 @@ function encerrar() {
   // desatenta" vira pergunta sem resposta.
   const abandonado = (!jogo.travado && jogo.par > 0) ? {
     par: jogo.par, movimentos: jogo.movimentos, despejos: jogo.despejos,
-    desfazer: jogo.desfazerNoTabuleiro,
+    desfazer: jogo.desfazerNoTabuleiro, faixa: jogo.faixa,
+    layout: jogo.layoutInicial,
     seg: (performance.now() - jogo.inicioTabuleiro) / 1000,
   } : null;
   jogo.travado = true;
@@ -1112,6 +1266,7 @@ function encerrar() {
       cls(esforco <= 1.15, esforco <= 1.4)]] : []),
     ["Desfazer usados", String(sessao.desfazer), "atencao"],
     ["Reinícios", String(sessao.reinicios), cls(sessao.reinicios === 0, sessao.reinicios <= 2)],
+    ["Maior sequência", String(sessao.maiorSequencia), cls(sessao.maiorSequencia >= 5, sessao.maiorSequencia >= 2)],
     ["Moedas ganhas", sessao.ganho.toLocaleString("pt-BR"), "atencao"],
     ["Nível de produção", String(sessao.nivel), cls(sessao.nivel > 0, true)],
     ...(sessao.investido ? [["Investido em produção", "−" + sessao.investido, "atencao"]] : []),
@@ -1137,6 +1292,9 @@ function encerrar() {
     "\nMovimentos: " + sessao.movimentos.join(", ") +
     "\nDespejos: " + sessao.despejos.join(", ") +
     "\nNós do solver: " + sessao.nos.join(", ") +
+    "\nFaixas: " + sessao.faixas.join(", ") +
+    "\nScores de dificuldade: " + sessao.scoresDif.join(", ") +
+    "\nLayouts: " + sessao.layouts.join(" ") +
     "\nPar: " + sessao.pares.join(", ");
 
   mostrar("telaFim");
@@ -1167,6 +1325,7 @@ document.getElementById("btDeNovo").onclick = () => {
     tabuleiro: 1, completados: 0, inicio: 0, tempos: [], movimentos: [],
     despejos: [], nos: [], pares: [], desfazer: 0, reinicios: 0, ganho: 0, gasto: 0,
     investido: 0, nivel: 0,
+    sequencia: 0, maiorSequencia: 0, layouts: [], faixas: [], scoresDif: [],
     enjoou: null, encerrada: false,
   });
   const be = document.getElementById("btEnjoei");
