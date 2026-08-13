@@ -935,7 +935,7 @@ function agendarQuadros() {
     const t = performance.now();
     for (let i = despejosEmVoo.length - 1; i >= 0; i--)
       if (t - despejosEmVoo[i].t0 > DESPEJO_MS) despejosEmVoo.splice(i, 1);
-    for (const [k, t0] of tubosEmFlash) if (t - t0 > FLASH_MS) tubosEmFlash.delete(k);
+    for (const [k, f] of tubosEmFlash) if (t - f.t0 > FLASH_MS) tubosEmFlash.delete(k);
     desenhar();
     if (despejosEmVoo.length || tubosEmFlash.size) requestAnimationFrame(passo);
     else quadroAgendado = false;
@@ -966,7 +966,6 @@ function desenhar() {
   const vidro = corDe("--vidro");
   const linha = corDe("--vidro-linha");
   const selec = corDe("--selecao");
-  const bom = corDe("--bom");
   const agora = performance.now();
 
   jogo.tubos.forEach((tubo, i) => {
@@ -990,20 +989,23 @@ function desenhar() {
     });
 
     // a borda (flash de completo > dica > seleção > repouso)
-    // o t0 pode estar no futuro: o flash espera o bloco em voo assentar
-    const flashT0 = tubosEmFlash.get(i);
-    const emFlash = flashT0 !== undefined && agora >= flashT0 && agora - flashT0 <= FLASH_MS;
+    // o t0 pode estar no futuro: o flash espera o bloco em voo assentar.
+    // A celebração é NA COR do tubo concluído — borda que estende a própria
+    // cor pra fora do vidro — com um véu de luz branca por cima, que brilha
+    // igual sobre qualquer tinta e em qualquer tema. (Verde igual pra todos
+    // ficava errado: seis tubos, um "verde de sistema" só.)
+    const flash = tubosEmFlash.get(i);
+    const emFlash = flash && agora >= flash.t0 && agora - flash.t0 <= FLASH_MS;
     const emDica = jogo.dica && (jogo.dica[0] === i || jogo.dica[1] === i);
-    ctx.strokeStyle = emFlash ? bom
+    ctx.strokeStyle = emFlash ? TINTAS[flash.cor]
                     : emDica ? corDe("--atencao")
                     : sel ? selec : linha;
     ctx.lineWidth = emFlash ? 3 : emDica ? 3 : sel ? 2 : 1;
     ctx.strokeRect(x + 0.5, y + 0.5, L.larguraTubo - 1, L.alturaTubo - 1);
     if (emFlash) {
-      // véu que esmaece: o "pronto!" sem partícula nenhuma
-      const resta = 1 - (agora - flashT0) / FLASH_MS;
-      ctx.globalAlpha = 0.28 * resta;
-      ctx.fillStyle = bom;
+      const resta = 1 - (agora - flash.t0) / FLASH_MS;
+      ctx.globalAlpha = 0.4 * resta;
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(x, y, L.larguraTubo, L.alturaTubo);
       ctx.globalAlpha = 1;
     }
@@ -1091,6 +1093,13 @@ const somRecipiente = () => {
   nota(275, { quando: 0.07, dur: 0.14, ganho: 0.06, tipo: "triangle" });
 };
 
+// Em TOQUE, pointerdown não conta como "ativação do usuário" pra política
+// de autoplay — só pointerup/click/touchend contam. Sem esta linha, o jogo
+// inteiro (que joga no pointerdown) nunca acordava o AudioContext no
+// celular e a sessão ficava muda do começo ao fim. As notas agendadas com
+// o contexto suspenso tocam assim que o pointerup do mesmo gesto resolve.
+addEventListener("pointerup", () => { if (somLigado) contextoDeAudio(); }, { passive: true });
+
 document.getElementById("btSom").onclick = e => {
   somLigado = !somLigado;
   e.currentTarget.textContent = somLigado ? "🔊" : "🔇";
@@ -1137,7 +1146,8 @@ function toque(ev) {
         y1: pPara.y + layout.alturaTubo - destino.length * layout.alturaCamada,
         t0: performance.now(),
       });
-      if (tuboCompleto(destino)) tubosEmFlash.set(i, performance.now() + DESPEJO_MS);
+      if (tuboCompleto(destino))
+        tubosEmFlash.set(i, { t0: performance.now() + DESPEJO_MS, cor: destino[0] });
       agendarQuadros();
     }
     somDespejo(jogo.tubos[i].length);

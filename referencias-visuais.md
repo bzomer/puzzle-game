@@ -45,7 +45,7 @@ Tudo cosmético: o estado do jogo **nunca espera** animação, e o toque nunca
 | --- | --- | --- |
 | Barra de progresso do tabuleiro | gênero: "quanto falta" sempre visível | linha de 4px sob o HUD, tubos completos / cores |
 | Animação de despejo | gênero: o líquido viaja | bloco-retângulo em arco curto, ~170ms, ease-out |
-| Flash no tubo completado | gênero: celebração imediata | borda + véu verde esmaecendo em ~650ms |
+| Flash no tubo completado | gênero: celebração imediata | borda **na cor concluída** + véu de luz branca esmaecendo em ~650ms (feedback de playtest: verde igual pra todos ficava errado) |
 | Tubo selecionado se ergue | gênero: "está na mão" | tubo inteiro sobe 5px (a corrida do topo já subia) |
 | "+N moedas" / "−N" flutuante | juice: feedback onde a ação aconteceu | texto mono sobre o palco, sobe e some |
 | Pulso nos valores do HUD | juice: aviso periférico de mudança | scale 1.28→1 em 220ms, só quando o valor muda |
