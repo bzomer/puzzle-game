@@ -132,6 +132,7 @@ ok(await ev(() => sessao.gastoRecipientes) === g0, 'não cobrou nada (veio do es
 ok(await ev(() => estoqueRecipientes) === 0, 'estoque baixou');
 
 console.log('T9 fim de sessão e zerar');
+await page.click('#btMenu');   // os instrumentos moram no menu ⚙
 await page.click('#btParei');
 ok(await ev(() => document.getElementById('telaFim').classList.contains('on')), 'tela de veredito abriu');
 await page.click('#btZerar');

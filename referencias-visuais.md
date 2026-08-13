@@ -145,6 +145,37 @@ ambiente; os sprites vieram de um repositório público no GitHub
 (eckz/bevy_flair) que já os embarcava com a licença documentada. No porte
 Godot, o zip completo do pacote (140 sprites) baixa direto do site.
 
+## Rodada 6: cara de jogo de verdade (a régua de instrumentos caiu)
+
+Veto de playtest certeiro: "não tem cara de jogo real, tem cara de jogo
+teste — isso é normal nos jogos que a gente quer monetizar?". Não é. O
+padrão do gênero é: fase no topo, moedas numa pílula, e botões de ÍCONE
+com o preço num badge. Instrumento de pesquisa não aparece na cara do
+jogo — e continua medindo por baixo.
+
+- **Topo**: "Fase N" em gótica no centro (mov/par numa sublinha discreta),
+  pílula de moedas e pílula de sequência (🔥, só aparece quando existe),
+  menu ⚙ à esquerda.
+- **Menu ⚙**: os instrumentos moram ali — som, "Enjoei agora", "Parei
+  aqui". O cronômetro saiu da tela (segue medido no encerrar).
+- **Rodapé**: banner do Desafio do dia + 4 botões de ícone (desfazer,
+  frasco, dica, reiniciar) com badges de preço ("−2", "grátis: 1",
+  "▶ anúncio", "sem saída").
+- **Ícones**: [game-icons.net](https://game-icons.net) — SVGs embutidos,
+  tingidos por CSS.
+
+## Créditos de assets (obrigações de licença)
+
+- **Ícones**: [game-icons.net](https://game-icons.net) — crystal-ball,
+  standing-potion, cycle e cog de **Lorc**; anticlockwise-rotation e
+  two-coins de **Delapouite** — licença
+  [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/).
+- **Molduras de botão**: [Fantasy UI Borders](https://kenney.nl/assets/fantasy-ui-borders)
+  de **Kenney** — CC0 (crédito por cortesia).
+- **Fontes**: [Pirata One](https://fonts.google.com/specimen/Pirata+One) e
+  [Almendra](https://fonts.google.com/specimen/Almendra) (Google Fonts) —
+  licença OFL.
+
 ## O que fica pro porte (Godot)
 
 Anotado aqui pra não virar scope creep no protótipo:

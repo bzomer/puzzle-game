@@ -142,6 +142,14 @@ DESAFIO_BONUS_MOEDAS: 25, DESAFIO_BONUS_RECIPIENTES: 1,
 FAIXAS: { leve, media, pesada }, TETO_PAREDE: 1.7,
 ```
 
+## Créditos de assets
+
+Ícones de [game-icons.net](https://game-icons.net) (Lorc e Delapouite,
+[CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/)); molduras de
+[Fantasy UI Borders](https://kenney.nl/assets/fantasy-ui-borders) (Kenney,
+CC0); fontes Pirata One e Almendra (Google Fonts, OFL). Detalhes e
+histórico das decisões visuais em `referencias-visuais.md`.
+
 ## Origem
 
 Nasceu como protótipo de um item da pesquisa e proposta de próximo jogo em
