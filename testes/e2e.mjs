@@ -3,7 +3,7 @@
 // recarrega a página pra provar a persistência, e mede o layout de celular.
 //
 //   npm i playwright-core   (uma vez; o Chromium vem do ambiente)
-//   node prototipos/sort-idle/testes/e2e.mjs
+//   node testes/e2e.mjs
 //
 // Não roda no CI (o harness puro cobre a lógica lá); este cobre o DOM, os
 // handlers e o fluxo inteiro de uma sessão — 40 asserções em 10 cenários.
@@ -11,7 +11,7 @@ import { chromium } from 'playwright-core';
 import http from 'http';
 import { readFileSync, existsSync } from 'fs';
 
-const html = readFileSync('new URL("../prototipo.html", import.meta.url)');
+const html = readFileSync(new URL("../index.html", import.meta.url));
 const server = http.createServer((q, r) => { r.setHeader('content-type', 'text/html; charset=utf-8'); r.end(html); }).listen(8123);
 
 let exe;

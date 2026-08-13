@@ -1,6 +1,6 @@
 # Evidências — harness do protótipo sort-idle
 
-Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica testada é importada direto de `prototipo.html`.
+Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica testada é importada direto de `index.html`.
 
 ## 1. Invariantes sob jogo aleatório
 300 partidas aleatórias: 224 vitórias, 18 becos, 0 quebras de invariante.
@@ -11,7 +11,7 @@ Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica t
   ✓ par confirmado descendo o gradiente em 6/6 tabuleiros (deu 6/6)
 
 ## 3. Gerador (200 tabuleiros, 6 cores)
-Tempo: 3850 ms no total (19.3 ms/tabuleiro).
+Tempo: 4162 ms no total (20.8 ms/tabuleiro).
 Par: mín 13, mediana 18, máx 21.
   ✓ nenhum tabuleiro insolúvel ou trivial servido
   ✓ geração média abaixo de 150 ms (não trava navegador)

@@ -1,8 +1,8 @@
 // Harness de testes do protótipo — roda sem navegador e sem gente.
 //
-//   node prototipos/sort-idle/testes/harness.mjs
+//   node testes/harness.mjs
 //
-// Importa a lógica pura direto do prototipo.html (fonte única — se a lógica
+// Importa a lógica pura direto do index.html (fonte única — se a lógica
 // mudar lá, os testes veem a mudança; não existe cópia pra divergir), roda
 // as baterias e escreve testes/evidencias.md. Sai com código ≠ 0 se
 // qualquer asserção falhar, então serve de CI.
@@ -161,7 +161,7 @@ function afirma(ok, rotulo) {
 diga("# Evidências — harness do protótipo sort-idle");
 diga("");
 diga("Gerado por `testes/harness.mjs` (rng com semente — reprodutível). " +
-     "A lógica testada é importada direto de `prototipo.html`.");
+     "A lógica testada é importada direto de `index.html`.");
 
 // ═══ 1. invariantes sob jogo aleatório ══════════════════════════════════
 diga("\n## 1. Invariantes sob jogo aleatório");

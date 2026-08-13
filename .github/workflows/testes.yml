@@ -1,0 +1,21 @@
+# Roda o harness a cada push e PR. Ele importa a lógica direto de
+# index.html e falha o build se qualquer asserção quebrar — invariantes,
+# solver, diretor de dificuldade, economia e regressões dos bugs achados
+# em playtest. Detalhe: ele reescreve testes/evidencias.md localmente;
+# aqui só validamos, o relatório versionado é o do commit.
+#
+# A bateria E2E (testes/e2e.mjs, joga o jogo de verdade num Chromium) não
+# roda aqui de propósito — depende de um navegador instalado e de tempo de
+# execução maior; ela é a verificação local antes de publicar
+# (`npm run e2e`), não o gate de todo push.
+name: testes
+on: [push, pull_request]
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node testes/harness.mjs
