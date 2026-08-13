@@ -104,6 +104,26 @@ const HUMANOS = [
       "4433-1325-5112-4030-0150-4225-- 1413-1503-3440-0222-1535-4025-- " +
       "1435-1105-2040-4435-1032-3522-- 0354-1541-0410-3552-2403-3212-- " +
       "0520-1324-5314-5230-4115-0234-- 5230-5152-3040-1202-4143-1453--").split(" ") },
+  // a sessão que decidiu o experimento da moeda: 3 recipientes comprados,
+  // todos em tabuleiro de aperto, com ZERO desfazer — o recipiente substituiu
+  // o desfazer como ferramenta de resgate. Produção segue 0/3 sessões.
+  { id: "s10-16tab-recipiente", j: "?",
+    t: [48,39,36,43,35,40,40,32,55,39,35,35,52,49,36,36],
+    m: [23,19,20,21,20,20,20,15,21,21,17,19,22,21,20,19],
+    d: [23,19,20,21,20,20,20,15,21,21,17,19,22,21,20,19],
+    nos: [2000,938,1572,938,686,1221,710,214,609,1333,524,1434,1601,207,556,644],
+    p: [20,18,19,19,19,19,19,13,19,20,15,18,18,18,18,17],
+    ganhoRelatado: 273, maiorSeq: 13,
+    recipientes: [0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
+    faixas: ["leve","leve","leve","media","media","pesada","leve","media","media","pesada","leve","media","media","pesada","leve","media"],
+    layouts: ("2534-0403-3153-1024-0515-4212-- 5114-0215-3132-2544-0430-3052-- " +
+      "2055-5025-1011-4302-3424-3431-- 1323-5440-4053-4312-5121-0520-- " +
+      "3023-1200-2410-5445-3215-1543-- 1034-1543-3150-1054-3254-0222-- " +
+      "4221-4351-5130-4352-0300-2145-- 3200-4441-3555-4002-2132-5113-- " +
+      "3013-2451-2300-5315-4204-1524-- 0534-0514-1223-1542-0423-3510-- " +
+      "1533-1455-0040-3414-5223-2201-- 0351-2322-0004-5434-5312-1514-- " +
+      "3001-0515-2043-2124-1554-3234-- 4453-4251-5310-0233-2154-0210-- " +
+      "4121-2403-5503-0034-2151-5342-- 1245-0225-2053-1140-5334-4310--").split(" ") },
 ];
 
 // ── utilidades ──────────────────────────────────────────────────────────
@@ -292,14 +312,18 @@ diga("\n## 5b. Validação direta — sessões com os tabuleiros exatos");
     });
     afirma(paresOk === sx.layouts.length,
       `${sx.id}: cadeia serializar→desserializar→solver íntegra (${paresOk}/${sx.layouts.length})`);
-    let ganho = 0, seq = 0;
+    let ganho = 0, seq = 0, maxSeq = 0;
     sx.p.forEach((par, i) => {
-      ganho += G.premioDoTabuleiro(par, sx.m[i], seq);
-      if (G.dentroDaTolerancia(par, sx.m[i])) seq++; else seq = 0;
+      const vial = sx.recipientes ? sx.recipientes[i] === 1 : false;
+      ganho += G.premioFinal(par, sx.m[i], seq, vial);
+      if (vial) { /* resgate congela a sequência */ }
+      else if (G.dentroDaTolerancia(par, sx.m[i])) {
+        seq++; maxSeq = Math.max(maxSeq, seq);
+      } else seq = 0;
     });
     afirma(ganho === sx.ganhoRelatado,
-      `${sx.id}: economia com streak reproduz a sessão à moeda (${ganho} = ${sx.ganhoRelatado})`);
-    afirma(seq === sx.maiorSeq, `${sx.id}: sequência reproduzida (${seq} = ${sx.maiorSeq})`);
+      `${sx.id}: economia (streak + resgates) reproduz a sessão à moeda (${ganho} = ${sx.ganhoRelatado})`);
+    afirma(maxSeq === sx.maiorSeq, `${sx.id}: maior sequência reproduzida (${maxSeq} = ${sx.maiorSeq})`);
     const ordem = sx.t.map((_, i) => i + 1);
     diga(`${sx.id} (n=${sx.t.length}): score-bot(50 rod.) ρ=${spearman(scores50, sx.t).toFixed(2)}, ` +
          `par ρ=${spearman(sx.p, sx.t).toFixed(2)}, ` +

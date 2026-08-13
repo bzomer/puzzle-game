@@ -11,7 +11,7 @@ Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica t
   ✓ par confirmado descendo o gradiente em 6/6 tabuleiros (deu 6/6)
 
 ## 3. Gerador (200 tabuleiros, 6 cores)
-Tempo: 2895 ms no total (14.5 ms/tabuleiro).
+Tempo: 4946 ms no total (24.7 ms/tabuleiro).
 Par: mín 13, mediana 18, máx 21.
   ✓ nenhum tabuleiro insolúvel ou trivial servido
   ✓ geração média abaixo de 150 ms (não trava navegador)
@@ -24,9 +24,9 @@ Correlações no mesmo conjunto: score×par ρ=0.32, score×nós ρ=0.16 — o b
   ✓ o score discrimina (não é constante)
 
 ## 5. Dados humanos (5 sessões, 66 tabuleiros): o que prevê o tempo
-tempo×par: ρ=0.60 (n=90)
-tempo×nós do A*: ρ=0.42 (n=42)
-tempo×(movimentos/par): ρ=-0.29 (n=90)
+tempo×par: ρ=0.56 (n=105)
+tempo×nós do A*: ρ=0.39 (n=57)
+tempo×(movimentos/par): ρ=-0.25 (n=105)
 
 **Correção que este harness impôs:** a conclusão anterior do projeto ("o par não prevê a dificuldade sentida") estava errada no agregado — com 61 tabuleiros, o par carrega sinal claro (ρ≈0,56). Ela parecia verdadeira dentro de cada sessão porque o gerador servia par quase constante (14–21, moda 19): sem variação, nenhuma correlação aparece. O que CONTINUA verdade, e importa mais: as catástrofes escapam do par.
 Os 2 piores tempos (182s e 149s) tinham par 19 e 19 — ambos ≤ Q75 dos pares (19). O papel do bot no diretor é este: detectar a armadilha de busca que o par não vê (Kristensen et al. 2024: simulado + humano > qualquer um sozinho). Validação direta bot×humano vem das próximas sessões: o resumo copiável agora carrega os layouts exatos servidos.
@@ -35,13 +35,17 @@ Os 2 piores tempos (182s e 149s) tinham par 19 e 19 — ambos ≤ Q75 dos pares 
 
 ## 5b. Validação direta — sessões com os tabuleiros exatos
   ✓ s8-A-9tab-diretor: cadeia serializar→desserializar→solver íntegra (9/9)
-  ✓ s8-A-9tab-diretor: economia com streak reproduz a sessão à moeda (175 = 175)
-  ✓ s8-A-9tab-diretor: sequência reproduzida (9 = 9)
+  ✓ s8-A-9tab-diretor: economia (streak + resgates) reproduz a sessão à moeda (175 = 175)
+  ✓ s8-A-9tab-diretor: maior sequência reproduzida (9 = 9)
 s8-A-9tab-diretor (n=9): score-bot(50 rod.) ρ=-0.03, par ρ=0.02, ordem ρ=0.68.
   ✓ s9-B-22tab-diretor: cadeia serializar→desserializar→solver íntegra (22/22)
-  ✓ s9-B-22tab-diretor: economia com streak reproduz a sessão à moeda (564 = 564)
-  ✓ s9-B-22tab-diretor: sequência reproduzida (22 = 22)
+  ✓ s9-B-22tab-diretor: economia (streak + resgates) reproduz a sessão à moeda (564 = 564)
+  ✓ s9-B-22tab-diretor: maior sequência reproduzida (22 = 22)
 s9-B-22tab-diretor (n=22): score-bot(50 rod.) ρ=0.15, par ρ=0.53, ordem ρ=-0.17.
+  ✓ s10-16tab-recipiente: cadeia serializar→desserializar→solver íntegra (16/16)
+  ✓ s10-16tab-recipiente: economia (streak + resgates) reproduz a sessão à moeda (273 = 273)
+  ✓ s10-16tab-recipiente: maior sequência reproduzida (13 = 13)
+s10-16tab-recipiente (n=16): score-bot(50 rod.) ρ=0.07, par ρ=0.51, ordem ρ=-0.00.
 
 Leitura das duas primeiras sessões pós-diretor: dentro da faixa segura, o par segue o melhor preditor grosso do tempo (ρ 0,53 no jogador B, n=22); o score do bot prevê pouco o tempo (0,02 e 0,25) — o papel dele é o filtro da cauda, não a régua fina. E o estado da pessoa pesa: na jogadora A o tempo subiu com a ordem (fadiga, ρ 0,68); no jogador B caiu (aprendizado, ρ −0,17), com as pesadas despencando de 149s na primeira para ~47s nas últimas.
   ✓ s8: sem parede (pior 1.4× a mediana; era 4,4× pré-diretor)
