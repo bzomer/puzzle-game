@@ -115,10 +115,21 @@
   .val small { font-size: 12px; font-weight: 400; color: var(--ink-dim); }
   .val.bom { color: var(--bom); }
   .val.ruim { color: var(--ruim); }
+  /* O pulso avisa perifericamente que o número mudou — o olho fica no
+     tabuleiro, não no placar. Referência: feedback imediato por ação é o
+     primeiro item de qualquer guia de game feel. */
+  .val.pulso { animation: val-pulso 220ms ease-out; }
+  @keyframes val-pulso { from { transform: scale(1.28); } to { transform: scale(1); } }
+
+  /* Progresso do tabuleiro: tubos já completos. Os líderes do gênero mostram
+     "quanto falta" o tempo todo; aqui é uma linha, não um medidor gritando. */
+  .progresso { height: 4px; background: var(--panel-sunk); border-bottom: 1px solid var(--line); }
+  .progresso div { height: 100%; width: 0%; background: var(--bom); transition: width 260ms ease; }
 
   /* ---- tabuleiro ---- */
   .palco {
     flex: 1;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -126,6 +137,40 @@
     min-height: 0;
   }
   canvas { display: block; touch-action: manipulation; }
+
+  /* Números que sobem do tabuleiro: prêmio ganho, custo pago. O valor tem
+     que aparecer ONDE a ação aconteceu, não só somado num contador. */
+  .flutuantes {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .flut {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 19px;
+    font-weight: 600;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    padding: 4px 12px;
+    opacity: 0;
+    animation: flut-sobe 1200ms ease-out forwards;
+  }
+  .flut.bom { color: var(--bom); border-color: var(--bom); }
+  .flut.ruim { color: var(--ruim); }
+  @keyframes flut-sobe {
+    0%   { opacity: 0; transform: translateY(12px); }
+    15%  { opacity: 1; transform: translateY(6px); }
+    70%  { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-28px); }
+  }
 
   /* ---- ações ---- */
   .acoes {
@@ -272,6 +317,9 @@
 
   @media (prefers-reduced-motion: reduce) {
     * { transition-duration: 1ms !important; }
+    .val.pulso { animation: none; }
+    /* sem movimento: o aviso aparece parado e some pelo timeout do JS */
+    .flut { animation: none; opacity: 1; }
   }
 </style>
 </head>
@@ -287,7 +335,12 @@
     <div><span class="rot">Sequência</span><span class="val" id="hudSeq">—</span></div>
   </div>
 
-  <div class="palco"><canvas id="tela"></canvas></div>
+  <div class="progresso" aria-hidden="true"><div id="barraTubos"></div></div>
+
+  <div class="palco">
+    <canvas id="tela"></canvas>
+    <div class="flutuantes" id="flutuantes" aria-hidden="true"></div>
+  </div>
 
   <div class="loja">
     <div style="display:flex; gap:8px">
@@ -819,6 +872,9 @@ function corDe(nome) {
 }
 
 function medir() {
+  // Qualquer remedição move os tubos de lugar — animação em voo apontaria
+  // pra coordenadas que já não existem.
+  limparAnimacoes();
   const palco = cv.parentElement;
   const larguraDisp = palco.clientWidth - 16;
   const alturaDisp = Math.max(220, palco.clientHeight - 8);
@@ -859,6 +915,46 @@ function posTubo(i) {
   };
 }
 
+/* Animações são SÓ cosmética: o estado do jogo nunca espera por elas, o
+   toque nunca é travado por elas — o E2E clica no ritmo dele e nada muda.
+   Tudo continua retângulo, então o porte pro Godot segue mecânico. */
+const MOTION_OK = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const DESPEJO_MS = 170;
+const FLASH_MS = 650;
+const despejosEmVoo = [];        // {para, lenFinal, n, cor, x0, y0, x1, y1, t0}
+const tubosEmFlash = new Map();  // índice do tubo -> timestamp de conclusão
+let quadroAgendado = false;
+
+function agendarQuadros() {
+  if (quadroAgendado) return;
+  quadroAgendado = true;
+  requestAnimationFrame(function passo() {
+    const t = performance.now();
+    for (let i = despejosEmVoo.length - 1; i >= 0; i--)
+      if (t - despejosEmVoo[i].t0 > DESPEJO_MS) despejosEmVoo.splice(i, 1);
+    for (const [k, t0] of tubosEmFlash) if (t - t0 > FLASH_MS) tubosEmFlash.delete(k);
+    desenhar();
+    if (despejosEmVoo.length || tubosEmFlash.size) requestAnimationFrame(passo);
+    else quadroAgendado = false;
+  });
+}
+
+function limparAnimacoes() {
+  despejosEmVoo.length = 0;
+  tubosEmFlash.clear();
+}
+
+// As camadas recém-chegadas ficam invisíveis no destino enquanto o bloco
+// voa até lá — senão apareceriam dobradas.
+function camadaEmVoo(tubo, nivel) {
+  return despejosEmVoo.some(a =>
+    a.para === tubo && nivel >= a.lenFinal - a.n && nivel < a.lenFinal);
+}
+
+function tuboCompleto(tubo) {
+  return tubo.length === CONFIG.CAPACIDADE && tubo.every(c => c === tubo[0]);
+}
+
 function desenhar() {
   if (!layout) return;
   const L = layout;
@@ -867,10 +963,15 @@ function desenhar() {
   const vidro = corDe("--vidro");
   const linha = corDe("--vidro-linha");
   const selec = corDe("--selecao");
+  const bom = corDe("--bom");
+  const agora = performance.now();
 
   jogo.tubos.forEach((tubo, i) => {
-    const { x, y } = posTubo(i);
+    const pos = posTubo(i);
     const sel = jogo.selecionado === i;
+    // Tubo selecionado se ergue inteiro — o gesto dos líderes do gênero
+    // pra dizer "este está na mão".
+    const x = pos.x, y = pos.y - (sel ? 5 : 0);
 
     // o vidro
     ctx.fillStyle = vidro;
@@ -878,18 +979,42 @@ function desenhar() {
 
     // o líquido, de baixo pra cima
     tubo.forEach((cor, nivel) => {
+      if (camadaEmVoo(i, nivel)) return;
       const erguida = sel && nivel >= tubo.length - corrida(tubo);
-      const cy = y + L.alturaTubo - (nivel + 1) * L.alturaCamada - (erguida ? 6 : 0);
+      const cy = y + L.alturaTubo - (nivel + 1) * L.alturaCamada - (erguida ? 5 : 0);
       ctx.fillStyle = TINTAS[cor];
       ctx.fillRect(x + 2, cy + 1, L.larguraTubo - 4, L.alturaCamada - 2);
     });
 
-    // a borda (a dica destaca origem e destino do movimento ótimo)
+    // a borda (flash de completo > dica > seleção > repouso)
+    // o t0 pode estar no futuro: o flash espera o bloco em voo assentar
+    const flashT0 = tubosEmFlash.get(i);
+    const emFlash = flashT0 !== undefined && agora >= flashT0 && agora - flashT0 <= FLASH_MS;
     const emDica = jogo.dica && (jogo.dica[0] === i || jogo.dica[1] === i);
-    ctx.strokeStyle = emDica ? corDe("--atencao") : sel ? selec : linha;
-    ctx.lineWidth = emDica ? 3 : sel ? 2 : 1;
+    ctx.strokeStyle = emFlash ? bom
+                    : emDica ? corDe("--atencao")
+                    : sel ? selec : linha;
+    ctx.lineWidth = emFlash ? 3 : emDica ? 3 : sel ? 2 : 1;
     ctx.strokeRect(x + 0.5, y + 0.5, L.larguraTubo - 1, L.alturaTubo - 1);
+    if (emFlash) {
+      // véu que esmaece: o "pronto!" sem partícula nenhuma
+      const resta = 1 - (agora - flashT0) / FLASH_MS;
+      ctx.globalAlpha = 0.28 * resta;
+      ctx.fillStyle = bom;
+      ctx.fillRect(x, y, L.larguraTubo, L.alturaTubo);
+      ctx.globalAlpha = 1;
+    }
   });
+
+  // os blocos em voo, por cima de tudo: sobem em arco curto e assentam
+  for (const a of despejosEmVoo) {
+    const t = Math.min(1, (agora - a.t0) / DESPEJO_MS);
+    const e = 1 - (1 - t) * (1 - t);   // ease-out
+    const x = a.x0 + (a.x1 - a.x0) * e;
+    const y = a.y0 + (a.y1 - a.y0) * e - Math.sin(Math.PI * e) * 12;
+    ctx.fillStyle = TINTAS[a.cor];
+    ctx.fillRect(x + 2, y + 1, L.larguraTubo - 4, a.n * L.alturaCamada - 2);
+  }
 }
 
 function tuboEm(px, py) {
@@ -921,11 +1046,27 @@ function toque(ev) {
   if (jogo.selecionado === i) { jogo.selecionado = -1; desenhar(); return; }
 
   if (podeDespejar(jogo.tubos, jogo.selecionado, i)) {
+    const de = jogo.selecionado;
     jogo.historico.push(jogo.tubos.map(t => t.slice()));
-    despejar(jogo.tubos, jogo.selecionado, i);
+    const n = despejar(jogo.tubos, de, i);
     jogo.movimentos++;
     jogo.despejos++;
     jogo.selecionado = -1;
+    if (MOTION_OK && layout) {
+      const destino = jogo.tubos[i];
+      const pDe = posTubo(de), pPara = posTubo(i);
+      despejosEmVoo.push({
+        para: i, n, lenFinal: destino.length,
+        cor: destino[destino.length - 1],
+        x0: pDe.x,
+        y0: pDe.y + layout.alturaTubo - (jogo.tubos[de].length + n) * layout.alturaCamada,
+        x1: pPara.x,
+        y1: pPara.y + layout.alturaTubo - destino.length * layout.alturaCamada,
+        t0: performance.now(),
+      });
+      if (tuboCompleto(destino)) tubosEmFlash.set(i, performance.now() + DESPEJO_MS);
+      agendarQuadros();
+    }
     atualizarHud();
     desenhar();
     if (resolvido(jogo.tubos)) concluir();
@@ -986,8 +1127,10 @@ function concluir() {
   // absolutos) e multiplicado pela sequência acumulada ANTES deste
   // tabuleiro — cada tabuleiro seguido no ritmo aumenta o próximo em 10%,
   // teto ×2. Fórmula pura em premioDoTabuleiro(), coberta pelo harness.
-  sessao.ganho += premioFinal(jogo.par, jogo.movimentos, sessao.sequencia,
+  const premio = premioFinal(jogo.par, jogo.movimentos, sessao.sequencia,
     jogo.recipienteComprado);
+  sessao.ganho += premio;
+  flutuar("+" + premio + " moedas", "bom");
   if (jogo.recipienteComprado) {
     // resgate congela a sequência: não estende (o tabuleiro foi facilitado),
     // não quebra (foi resolvido) — é o que o torna melhor que reiniciar
@@ -1002,6 +1145,7 @@ function concluir() {
     estoqueRecipientes += CONFIG.DESAFIO_BONUS_RECIPIENTES;
     diaDesafioFeito = diaHoje();
     sessao.desafioFeito = true;
+    flutuar("★ +" + CONFIG.DESAFIO_BONUS_MOEDAS + " e +1 recipiente", "bom");
   }
   salvar();
 
@@ -1045,6 +1189,28 @@ function custoDesfazerAtual() {
   return custoDesfazerPuro(sessao.completados, jogo.desfazerNoTabuleiro);
 }
 
+// Número que sobe do tabuleiro. O contador do HUD registra; isto AVISA.
+function flutuar(texto, classe) {
+  const caixa = document.getElementById("flutuantes");
+  const el = document.createElement("span");
+  el.className = "flut" + (classe ? " " + classe : "");
+  el.textContent = texto;
+  caixa.appendChild(el);
+  el.addEventListener("animationend", () => el.remove());
+  setTimeout(() => el.remove(), 2200);   // rede: reduced-motion não anima
+}
+
+// Troca o texto de um valor do HUD e pulsa SÓ quando ele mudou de verdade —
+// atualizarHud roda a cada toque, e pulsar sem mudança viraria ruído.
+function defVal(el, texto, html) {
+  if ((html ? el.innerHTML : el.textContent) === texto) return;
+  if (html) el.innerHTML = texto; else el.textContent = texto;
+  if (!MOTION_OK) return;
+  el.classList.remove("pulso");
+  void el.offsetWidth;   // reinicia a animação CSS
+  el.classList.add("pulso");
+}
+
 function atualizarHud() {
   const bdes = document.getElementById("btDesafio");
   const desafioFeitoHoje = diaDesafioFeito === diaHoje();
@@ -1058,28 +1224,33 @@ function atualizarHud() {
   bdi.disabled = jogo.travado || sessao.encerrada;
 
   const md = document.getElementById("hudMoeda");
-  md.textContent = saldo().toLocaleString("pt-BR");
-  md.className = "val" + (saldo() < CONFIG.CUSTO_DESFAZER ? " ruim" : "");
+  md.classList.toggle("ruim", saldo() < CONFIG.CUSTO_DESFAZER);
+  defVal(md, saldo().toLocaleString("pt-BR"));
 
   // O multiplicador mostrado é o que o PRÓXIMO tabuleiro paga — é a coisa
   // que a pessoa está prestes a perder, que é onde mora a força do streak.
   const sq = document.getElementById("hudSeq");
   const multSeq = Math.min(CONFIG.SEQUENCIA_MAX,
     1 + CONFIG.SEQUENCIA_BONUS * sessao.sequencia);
-  sq.textContent = sessao.sequencia > 0
-    ? sessao.sequencia + "×" + multSeq.toFixed(1).replace(".", ",") : "—";
-  sq.className = "val" + (sessao.sequencia >= 3 ? " bom" : "");
+  sq.classList.toggle("bom", sessao.sequencia >= 3);
+  defVal(sq, sessao.sequencia > 0
+    ? sessao.sequencia + "×" + multSeq.toFixed(1).replace(".", ",") : "—");
 
   // Passado o alvo, o contador para de mostrar a meta e vira um marcador de
   // quanto a pessoa aguentou — que é o que interessa daí pra frente.
-  document.getElementById("hudTab").innerHTML = sessao.completados >= CONFIG.TABULEIROS_ALVO
+  defVal(document.getElementById("hudTab"), sessao.completados >= CONFIG.TABULEIROS_ALVO
     ? sessao.tabuleiro + "<small> ✓</small>"
-    : sessao.tabuleiro + "<small>/" + CONFIG.TABULEIROS_ALVO + "</small>";
+    : sessao.tabuleiro + "<small>/" + CONFIG.TABULEIROS_ALVO + "</small>", true);
   const mv = document.getElementById("hudMov");
-  mv.textContent = jogo.movimentos;
-  mv.className = "val" + (jogo.movimentos > jogo.par ? " ruim"
-                        : jogo.movimentos && jogo.movimentos <= jogo.par ? " bom" : "");
-  document.getElementById("hudPar").textContent = jogo.par || "—";
+  mv.classList.toggle("ruim", jogo.movimentos > jogo.par);
+  mv.classList.toggle("bom", jogo.movimentos > 0 && jogo.movimentos <= jogo.par);
+  defVal(mv, String(jogo.movimentos));
+  defVal(document.getElementById("hudPar"), String(jogo.par || "—"));
+
+  // Barra de progresso: tubos já uniformes e cheios, sobre o total de cores.
+  const completos = jogo.tubos.filter(tuboCompleto).length;
+  document.getElementById("barraTubos").style.width =
+    (100 * completos / CONFIG.CORES) + "%";
   const bd = document.getElementById("btDesfazer");
   const custoD = custoDesfazerAtual();
   const gratis = custoD === 0;
@@ -1097,7 +1268,9 @@ function atualizarHud() {
   // Medido: 9 em 200 partidas aleatórias chegam a beco sem saída. Um humano
   // cai nisso bem menos, mas travado sem aviso ele acha que é bug — e o
   // playtest passa a medir a confusão em vez do jogo.
-  const preso = !jogo.travado && emprensado(jogo.tubos);
+  // O tabuleiro resolvido também não tem movimento legal — sem o teste de
+  // resolvido, o botão gritava "Sem saída" nos 450ms antes do próximo.
+  const preso = !jogo.travado && !resolvido(jogo.tubos) && emprensado(jogo.tubos);
   const bt = document.getElementById("btReiniciar");
   bt.textContent = preso ? "Sem saída — reiniciar" : "Reiniciar";
   bt.classList.toggle("forte", preso);
@@ -1131,11 +1304,15 @@ document.getElementById("btDesfazer").onclick = () => {
   const custoD = custoDesfazerAtual();
   if (saldo() < custoD) return;
   sessao.gasto += custoD;
+  // Cobrança visível no lugar da ação: o preço já está no botão, mas o
+  // débito acontecendo é o que faz o custo pesar de verdade na decisão.
+  if (custoD > 0) flutuar("−" + custoD + " moedas", "ruim");
   jogo.desfazerNoTabuleiro++;
   jogo.tubos = jogo.historico.pop();
   jogo.movimentos = Math.max(0, jogo.movimentos - 1);
   jogo.selecionado = -1;
   sessao.desfazer++;
+  limparAnimacoes();   // o voo em andamento apontaria pra camadas que já não existem
   atualizarHud();
   desenhar();
 };
