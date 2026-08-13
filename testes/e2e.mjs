@@ -28,12 +28,10 @@ let falhas = 0;
 const ok = (cond, rot) => { console.log((cond ? '  ✓ ' : '  ✗ FALHOU: ') + rot); if (!cond) falhas++; };
 const ev = (fn, ...a) => page.evaluate(fn, ...a);
 
-// Todo load recebe com a tela inicial e o caminho de fases —
-// entrar = Iniciar → Jogar fase atual.
+// A tela inicial recebe em todo load — entrar = tocar em Jogar.
 const entrar = async () => {
   await page.waitForFunction('typeof jogo !== "undefined"', { timeout: 15000 });
   await page.click('#btJogar');
-  await page.click('#btFaseAtual');
   await page.waitForFunction('jogo.par > 0', { timeout: 15000 });
 };
 

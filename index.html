@@ -149,8 +149,38 @@
     justify-content: center;
     padding: 4px 8px;
     min-height: 0;
+    /* a bancada da bruxa: vinheta suave fecha a cena */
+    background: radial-gradient(ellipse at 50% 34%,
+      transparent 40%, rgba(0, 0, 0, 0.07) 100%);
+    overflow: hidden;
   }
-  canvas { display: block; touch-action: manipulation; }
+  /* poeira mágica: pontinhos que piscam devagar, quase subliminares */
+  .palco::before, .palco::after {
+    content: "";
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    pointer-events: none;
+    animation: cintila 5s ease-in-out infinite;
+  }
+  .palco::before {
+    top: 12%;
+    left: 12%;
+    box-shadow: 68vw 9vh 0 -0.5px var(--ink-faint),
+                31vw 52vh 0 -1px var(--ink-faint),
+                55vw 30vh 0 0 var(--ink-faint);
+  }
+  .palco::after {
+    top: 68%;
+    left: 84%;
+    animation-delay: 2.4s;
+    box-shadow: -64vw -14vh 0 -0.5px var(--ink-faint),
+                -22vw 6vh 0 -1px var(--ink-faint);
+  }
+  @keyframes cintila { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.55; } }
+  canvas { display: block; touch-action: manipulation; position: relative; }
 
   /* Números que sobem do tabuleiro: prêmio ganho, custo pago. O valor tem
      que aparecer ONDE a ação aconteceu, não só somado num contador. */
@@ -408,78 +438,13 @@
     to   { transform: scale(1); opacity: 1; }
   }
 
-  /* ---- o caminho de fases ----
-     Trilha zigue-zague, de baixo pra cima (subir = progredir), com a fase
-     atual pulsando. Pedido direto de playtest: a sensação de avanço ao
-     VOLTAR ao jogo — o mapa é o lugar onde o progresso mora. */
-  .caminho-folha { min-height: 100dvh; gap: 10px; padding-top: 20px; }
-  .caminho-topo { text-align: center; }
-  .caminho {
-    display: flex;
-    flex-direction: column-reverse;
-    align-items: center;
-    gap: 30px;
-    padding: 26px 0 10px;
-    position: relative;
-  }
-  .caminho::before {
-    content: "";
-    position: absolute;
-    top: 12px;
-    bottom: 12px;
-    left: 50%;
-    border-left: 3px dashed var(--line-strong);
-    opacity: 0.55;
-  }
-  .no {
-    flex: 0 0 auto;
-    width: 56px;
-    height: 56px;
-    padding: 0;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--mono);
-    font-size: 16px;
-    border: 2px solid var(--line-strong);
-    position: relative;
-    z-index: 1;
-  }
-  .no:nth-child(odd) { margin-right: 104px; }
-  .no:nth-child(even) { margin-left: 104px; }
-  .no.feita { border-color: var(--bom); color: var(--bom); background: var(--panel); }
-  .no.feita::after {
-    content: "✓";
-    position: absolute;
-    top: -8px;
-    right: -3px;
-    font-size: 13px;
-  }
-  .no.atual {
-    background: var(--realce);
-    border-color: var(--realce);
-    color: var(--sobre-realce);
-    font-size: 19px;
-    animation: no-pulsa 1.6s ease-in-out infinite;
-  }
-  .no.futura { opacity: 0.4; color: var(--ink-faint); background: var(--panel); }
-  @keyframes no-pulsa { 50% { transform: scale(1.12); } }
-  .caminho-pe {
-    position: sticky;
-    bottom: 0;
-    padding: 14px 0 6px;
-    background: linear-gradient(transparent, var(--ground) 45%);
-    display: flex;
-  }
-
   @media (prefers-reduced-motion: reduce) {
     * { transition-duration: 1ms !important; }
     .val.pulso { animation: none; }
     /* sem movimento: o aviso aparece parado e some pelo timeout do JS */
     .flut { animation: none; opacity: 1; }
     .brinde-carta { animation: none; }
-    .no.atual { animation: none; }
+    .palco::before, .palco::after { animation: none; opacity: 0.2; }
   }
 </style>
 </head>
@@ -533,7 +498,10 @@
   </div>
 </div>
 
-<!-- Tela inicial: identidade + um toque. Daqui vai pro caminho de fases. -->
+<!-- Tela inicial: identidade + um toque pra jogar. O caminho de fases foi
+     testado e ENGAVETADO junto com a designer (a pesquisa do gênero diz
+     entrada direta; a ideia fica pro projeto-irmão mais robusto — está no
+     histórico do git se precisar voltar). -->
 <div class="tela on" id="telaInicio">
   <div class="folha inicio">
     <div>
@@ -541,7 +509,7 @@
       <h2 class="titulo">Poções da Bruxa</h2>
       <p class="lema">Separe as poções. Complete os frascos.</p>
     </div>
-    <button class="forte jogar" id="btJogar">▶ Iniciar</button>
+    <button class="forte jogar" id="btJogar">▶ Jogar — fase <span id="iniFase">1</span></button>
     <div class="fichas">
       <span class="ficha">🪙 <b id="iniMoedas">0</b> moedas</span>
       <span class="ficha">✔ <b id="iniFases">0</b> fases completas</span>
@@ -550,20 +518,6 @@
     <p class="nota" style="border-top:0; padding-top:0">
       Sem cadastro e sem espera — o progresso fica salvo neste aparelho.
     </p>
-  </div>
-</div>
-
-<!-- O caminho de fases: o progresso mora aqui. Só a fase atual é clicável. -->
-<div class="tela" id="telaCaminho">
-  <div class="folha caminho-folha">
-    <div class="caminho-topo">
-      <h2>O caminho</h2>
-      <p><b id="camFases">0</b> fases completas — a próxima te espera.</p>
-    </div>
-    <div class="caminho" id="caminho"></div>
-    <div class="caminho-pe">
-      <button class="forte jogar" id="btFaseAtual">▶ Jogar fase 1</button>
-    </div>
   </div>
 </div>
 
@@ -1075,10 +1029,36 @@ function corDe(nome) {
   return getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
 }
 
+// Mistura um hex com branco (f > 0) ou preto (f < 0). É o que dá volume ao
+// líquido: topo iluminado, fundo na penumbra.
+function tom(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const alvo = f > 0 ? 255 : 0, t = Math.abs(f);
+  const m = c => Math.round(c + (alvo - c) * t);
+  return "rgb(" + m((n >> 16) & 255) + "," + m((n >> 8) & 255) + "," + m(n & 255) + ")";
+}
+
+// Gradientes do líquido, um por tinta, refeitos quando a camada muda de
+// altura (medir limpa). Coordenadas relativas — o desenho translada.
+const gradientes = new Map();
+function gradienteDe(cor) {
+  let g = gradientes.get(cor);
+  if (!g) {
+    g = ctx.createLinearGradient(0, 0, 0, layout.alturaCamada);
+    g.addColorStop(0, tom(TINTAS[cor], 0.22));
+    g.addColorStop(0.4, TINTAS[cor]);
+    g.addColorStop(1, tom(TINTAS[cor], -0.16));
+    gradientes.set(cor, g);
+  }
+  return g;
+}
+
 function medir() {
   // Qualquer remedição move os tubos de lugar — animação em voo apontaria
-  // pra coordenadas que já não existem.
+  // pra coordenadas que já não existem. Os gradientes dependem da altura
+  // da camada, então também se refazem.
   limparAnimacoes();
+  gradientes.clear();
   const palco = cv.parentElement;
   const larguraDisp = palco.clientWidth - 16;
   const alturaDisp = Math.max(220, palco.clientHeight - 8);
@@ -1169,51 +1149,81 @@ function desenhar() {
   const selec = corDe("--selecao");
   const agora = performance.now();
 
-  // Frasco de poção, não barra: boca reta com rolha, fundo bem arredondado,
-  // brilho de vidro. Ainda são retângulos e cantos — no Godot vira
-  // StyleBoxFlat com corner_radius + um sprite de rolha, porte mecânico.
+  // Frasco de poção de verdade: gargalo estreito com rolha enfiada, ombros,
+  // corpo de fundo bem arredondado, sombra no chão e brilho no vidro. A
+  // ÁREA DO LÍQUIDO continua o retângulo de sempre (nenhuma conta de layout
+  // mudou) — o gargalo é decoração acima dela. No Godot, a silhueta vira um
+  // Polygon2D/sprite e o líquido continua draw_rect: porte mecânico.
   const raio = Math.min(14, L.larguraTubo / 2.6);
   const rolha = corDe("--rolha");
-  const tracarTubo = (x, y) => {
+  const GARGALO = 9;   // altura do gargalo acima da área de líquido
+  const tracarFrasco = (x, y) => {
+    const w = L.larguraTubo, h = L.alturaTubo;
+    const gw = w * 0.56, gx = x + (w - gw) / 2;
     ctx.beginPath();
-    ctx.roundRect(x, y, L.larguraTubo, L.alturaTubo, [3, 3, raio, raio]);
+    ctx.moveTo(gx, y - GARGALO);
+    ctx.lineTo(gx, y - 2);
+    ctx.lineTo(x, y + 2);                              // ombro esquerdo
+    ctx.lineTo(x, y + h - raio);
+    ctx.arcTo(x, y + h, x + raio, y + h, raio);        // fundo
+    ctx.lineTo(x + w - raio, y + h);
+    ctx.arcTo(x + w, y + h, x + w, y + h - raio, raio);
+    ctx.lineTo(x + w, y + 2);
+    ctx.lineTo(gx + gw, y - 2);                        // ombro direito
+    ctx.lineTo(gx + gw, y - GARGALO);
+    ctx.closePath();
   };
 
   jogo.tubos.forEach((tubo, i) => {
     const pos = posTubo(i);
     const sel = jogo.selecionado === i;
-    // Tubo selecionado se ergue inteiro — o gesto dos líderes do gênero
+    // Frasco selecionado se ergue inteiro — o gesto dos líderes do gênero
     // pra dizer "este está na mão".
     const x = pos.x, y = pos.y - (sel ? 5 : 0);
+    const w = L.larguraTubo, h = L.alturaTubo;
 
-    // a rolha, pousada na boca
-    const rw = L.larguraTubo * 0.44;
+    // sombra no chão: pousa o frasco na prateleira
+    ctx.fillStyle = "rgba(0, 0, 0, 0.10)";
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, pos.y + h + 3, w * 0.42, 3.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // a rolha, enfiada no gargalo
+    const rw = w * 0.36;
     ctx.fillStyle = rolha;
     ctx.beginPath();
-    ctx.roundRect(x + (L.larguraTubo - rw) / 2, y - 7, rw, 8, 2);
+    ctx.roundRect(x + (w - rw) / 2, y - GARGALO - 6, rw, 9, 2.5);
     ctx.fill();
 
     // o vidro
-    tracarTubo(x, y);
+    tracarFrasco(x, y);
     ctx.fillStyle = vidro;
     ctx.fill();
 
-    // o líquido, de baixo pra cima, recortado pela forma do vidro
+    // o líquido, de baixo pra cima, recortado pela silhueta do vidro
     ctx.save();
-    tracarTubo(x, y);
+    tracarFrasco(x, y);
     ctx.clip();
     tubo.forEach((cor, nivel) => {
       if (camadaEmVoo(i, nivel)) return;
       const erguida = sel && nivel >= tubo.length - corrida(tubo);
-      const cy = y + L.alturaTubo - (nivel + 1) * L.alturaCamada - (erguida ? 5 : 0);
-      ctx.fillStyle = TINTAS[cor];
-      ctx.fillRect(x + 2, cy + 1, L.larguraTubo - 4, L.alturaCamada - 2 +
+      const cy = y + h - (nivel + 1) * L.alturaCamada - (erguida ? 5 : 0);
+      ctx.save();
+      ctx.translate(0, cy + 1);
+      ctx.fillStyle = gradienteDe(cor);
+      ctx.fillRect(x + 2, 0, w - 4, L.alturaCamada - 2 +
         (nivel === 0 ? raio : 0));   // a camada do fundo preenche a curva
+      ctx.restore();
+      // a superfície da poção reluz
+      if (nivel === tubo.length - 1) {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.30)";
+        ctx.fillRect(x + 2, cy + 1, w - 4, 2);
+      }
     });
 
     // brilho de vidro: uma lasca de luz na parede esquerda
-    ctx.fillStyle = "rgba(255, 255, 255, 0.20)";
-    ctx.fillRect(x + 3, y + 3, 3, L.alturaTubo - 8);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
+    ctx.fillRect(x + 3, y + 4, 3, h - 10);
 
     // flash de completo: véu de luz branca dentro do vidro.
     // o t0 pode estar no futuro: espera o bloco em voo assentar.
@@ -1223,20 +1233,20 @@ function desenhar() {
       const resta = 1 - (agora - flash.t0) / FLASH_MS;
       ctx.globalAlpha = 0.4 * resta;
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(x, y, L.larguraTubo, L.alturaTubo);
+      ctx.fillRect(x, y - GARGALO, w, h + GARGALO);
       ctx.globalAlpha = 1;
     }
     ctx.restore();
 
     // a borda (flash de completo > dica > seleção > repouso). No flash, a
-    // borda estende A COR do tubo concluído — não um verde de sistema igual
-    // pra todos (veto de playtest).
+    // borda estende A COR do frasco concluído — não um verde de sistema
+    // igual pra todos (veto de playtest).
     const emDica = jogo.dica && (jogo.dica[0] === i || jogo.dica[1] === i);
     ctx.strokeStyle = emFlash ? TINTAS[flash.cor]
                     : emDica ? corDe("--atencao")
                     : sel ? selec : linha;
-    ctx.lineWidth = emFlash ? 3 : emDica ? 3 : sel ? 2 : 1;
-    tracarTubo(x, y);
+    ctx.lineWidth = emFlash ? 3 : emDica ? 3 : sel ? 2 : 1.25;
+    tracarFrasco(x, y);
     ctx.stroke();
   });
 
@@ -2000,9 +2010,10 @@ if (save && typeof save.banco === "number") {
   }
 }
 
-// A tela inicial recebe; o caminho mostra o progresso; o relógio da sessão
-// só liga quando a fase começa — tempo de menu não suja a métrica.
+// A tela inicial recebe; o relógio da sessão só liga no toque em Jogar —
+// tempo de menu não é tempo de jogo, e a métrica de sessão não pode sujar.
 function preencherInicio() {
+  document.getElementById("iniFase").textContent = fasesGlobais + 1;
   document.getElementById("iniMoedas").textContent = saldo().toLocaleString("pt-BR");
   document.getElementById("iniFases").textContent = fasesGlobais;
   document.getElementById("iniDesafio").textContent =
@@ -2018,41 +2029,10 @@ function preencherInicio() {
   }
 }
 
-// O caminho: fases feitas ✓, a atual pulsando, as futuras à espreita.
-// Sempre alguns nós à frente — o caminho nunca termina, como as fases.
-function montarCaminho() {
-  const cx = document.getElementById("caminho");
-  cx.innerHTML = "";
-  const total = Math.max(12, fasesGlobais + 8);
-  for (let f = 1; f <= total; f++) {
-    const no = document.createElement("button");
-    no.type = "button";
-    no.className = "no " + (f <= fasesGlobais ? "feita"
-                          : f === fasesGlobais + 1 ? "atual" : "futura");
-    no.textContent = f;
-    no.disabled = f !== fasesGlobais + 1;
-    if (!no.disabled) no.onclick = comecarFase;
-    cx.appendChild(no);
-  }
-  document.getElementById("camFases").textContent = fasesGlobais;
-  document.getElementById("btFaseAtual").textContent =
-    "▶ Jogar fase " + (fasesGlobais + 1);
-  requestAnimationFrame(() => {
-    const atual = cx.querySelector(".atual");
-    if (atual) atual.scrollIntoView({ block: "center" });
-  });
-}
-
-function comecarFase() {
+document.getElementById("btJogar").onclick = () => {
   mostrar(null);
   novoTabuleiro();
-}
-
-document.getElementById("btJogar").onclick = () => {
-  montarCaminho();
-  mostrar("telaCaminho");
 };
-document.getElementById("btFaseAtual").onclick = comecarFase;
 
 preencherInicio();
 mostrar("telaInicio");
