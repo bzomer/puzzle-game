@@ -11,7 +11,7 @@ Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica t
   ✓ par confirmado descendo o gradiente em 6/6 tabuleiros (deu 6/6)
 
 ## 3. Gerador (200 tabuleiros, 6 cores)
-Tempo: 2642 ms no total (13.2 ms/tabuleiro).
+Tempo: 2683 ms no total (13.4 ms/tabuleiro).
 Par: mín 13, mediana 18, máx 21.
   ✓ nenhum tabuleiro insolúvel ou trivial servido
   ✓ geração média abaixo de 150 ms (não trava navegador)

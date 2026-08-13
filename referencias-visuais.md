@@ -130,6 +130,21 @@ match-3 entregam. Registrado como aposta da casa, não como consenso.
   Fluxo: tela inicial → caminho → fase (o relógio da sessão só liga na
   fase). Nome provisório: **Poções da Bruxa**.
 
+## Rodada 5: assets CC0 de verdade nos botões
+
+Pedido da designer: buscar pacotes de assets gratuitos porque os botões
+procedurais não convenciam. Achado e adotado: **Fantasy UI Borders**
+([Kenney](https://kenney.nl/assets/fantasy-ui-borders), CC0 1.0 — domínio
+público, uso comercial livre, sem exigência de crédito). Os sprites de
+moldura 9-slice viraram `border-image` dos botões e da carta de fase
+concluída, embutidos como data-URI (~200 bytes cada, tingidos por tema:
+marrom no pergaminho, branco na noite) — o jogo segue um arquivo só.
+
+Nota de processo: kenney.nl e opengameart são bloqueados pelo proxy deste
+ambiente; os sprites vieram de um repositório público no GitHub
+(eckz/bevy_flair) que já os embarcava com a licença documentada. No porte
+Godot, o zip completo do pacote (140 sprites) baixa direto do site.
+
 ## O que fica pro porte (Godot)
 
 Anotado aqui pra não virar scope creep no protótipo:
