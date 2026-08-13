@@ -1085,11 +1085,15 @@ function tecla(freq, { dur = 0.55, ganho = 0.055, quando = 0 } = {}) {
 // gostei"): a seleção ficou MUDA (o tubo erguendo é o feedback) e o despejo
 // virou percussão abafada — um toc de madeira com feltro, curto e grave, que
 // sobe um nadinha conforme o destino enche. Informação, não melodia.
+// Balanço acertado de ouvido em playtest: o toc precisa de MAIS ganho que
+// as teclas (grave soa mais baixo que agudo em ganho igual — curva de
+// loudness) e não pode descer de ~250 Hz, que alto-falante de celular não
+// reproduz. O sino do completo, agudo, vive com menos.
 const somDespejo = nivel =>
-  tecla(150 + 20 * (Math.min(nivel, 4) - 1), { dur: 0.09, ganho: 0.05 });
+  tecla(250 + 25 * (Math.min(nivel, 4) - 1), { dur: 0.1, ganho: 0.09 });
 const somCompleto = quando => {
-  tecla(659, { quando, ganho: 0.06 });
-  tecla(1046, { quando: quando + 0.12, dur: 0.8, ganho: 0.05 });
+  tecla(659, { quando, ganho: 0.05 });
+  tecla(1046, { quando: quando + 0.12, dur: 0.8, ganho: 0.04 });
 };
 const somVitoria = () =>
   [523, 659, 784, 1046].forEach((f, i) =>
