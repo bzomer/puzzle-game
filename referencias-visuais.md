@@ -80,6 +80,102 @@ Botão 🔊/🔇 na fileira da loja; a preferência persiste no save. Se o
 navegador bloquear áudio (autoplay), o jogo segue mudo sem reclamar. No
 porte Godot cada `som*` vira um `AudioStreamPlayer` com sample de verdade.
 
+## Rodada 3: estrutura de telas e identidade ("cara de jogo")
+
+Veto de playtest na estética de instrumento: "continua muito cara de teste
+(...) não é uma cara de um jogo legalzinho". Pesquisa antes de mexer — a
+pergunta era se o costume pede tela inicial com mapa de fases:
+
+- [Poki: quality guidelines](https://sdk.poki.com/poki-quality-guidelines) e
+  [requirements](https://sdk.poki.com/new-requirements) — na web o costume é
+  o CONTRÁRIO de menu: mínimo de telas, jogador dentro do jogo em <10 s.
+- Líderes do gênero ([Water Sort](https://play.google.com/store/apps/details?id=water.sort.puzzle.color.sort.games),
+  [SortPuz](https://play.google.com/store/apps/details?id=sortpuz.water.sort.puzzle.game)) —
+  abrem direto na fase atual; a progressão é **número de fase contínuo**
+  ("Level 234"), sem mapa (mapa é meta de match-3). O que É universal:
+  tela de **"level complete"** com o prêmio.
+- [Hypercasual UI/UX guide](https://pixune.com/blog/hypercasual-games-ui-ux-design-guide/) —
+  botões grandes e amigáveis, clareza acima de tudo.
+
+O que entrou, seguindo o consenso:
+
+- **Tela inicial leve**: paleta das 8 tintas como marca, título, UM botão
+  ("Jogar — fase N") e fichas de status (moedas, fases completas, desafio).
+  O relógio da sessão só liga no toque em Jogar — tempo de menu não suja a
+  métrica de sessão.
+- **Fase global persistida**: contagem de tabuleiros completados de todos os
+  tempos, o número que só cresce. O "N/10" do instrumento saiu do HUD; o
+  alvo de 10 por sessão segue vivo em `sessao.completados` e no veredito.
+- **Carta de fase concluída**: pula no centro com o prêmio e some sozinha
+  (1,4 s) — celebração sem clique extra entre fases.
+- **Cromo com cor**: `--realce` (o azul das tintas, promovido a marca) nos
+  botões fortes; cantos arredondados em botões e cartas; **tubos com cara de
+  tubo** no canvas (boca reta, fundo arredondado, líquido recortado pela
+  forma do vidro — no Godot vira `StyleBoxFlat` com `corner_radius`).
+
+## Rodada 4: tema "casa da bruxa" e o caminho de fases
+
+Direção de arte escolhida pela designer: poção / casa da bruxa / mago de
+RPG. E um **override consciente da pesquisa da rodada 3**: o caminho de
+fases entrou mesmo não sendo costume do gênero sort — o motivo declarado é
+a sensação de progresso AO VOLTAR, que é exatamente o que os mapas de
+match-3 entregam. Registrado como aposta da casa, não como consenso.
+
+- **Tema**: pergaminho/madeira de dia, roxo profundo à luz de vela de
+  noite; serifa de grimório nos títulos; roxo místico como cor de marca.
+- **Frascos de poção** no canvas: rolha pousada na boca, fundo bem
+  arredondado, lasca de brilho no vidro — ainda retângulos e cantos.
+- **Caminho de fases**: trilha zigue-zague de baixo pra cima, feitas ✓,
+  atual pulsando, futuras à espreita, sempre 8 nós à frente do jogador.
+  Fluxo: tela inicial → caminho → fase (o relógio da sessão só liga na
+  fase). Nome provisório: **Poções da Bruxa**.
+
+## Rodada 5: assets CC0 de verdade nos botões
+
+Pedido da designer: buscar pacotes de assets gratuitos porque os botões
+procedurais não convenciam. Achado e adotado: **Fantasy UI Borders**
+([Kenney](https://kenney.nl/assets/fantasy-ui-borders), CC0 1.0 — domínio
+público, uso comercial livre, sem exigência de crédito). Os sprites de
+moldura 9-slice viraram `border-image` dos botões e da carta de fase
+concluída, embutidos como data-URI (~200 bytes cada, tingidos por tema:
+marrom no pergaminho, branco na noite) — o jogo segue um arquivo só.
+
+Nota de processo: kenney.nl e opengameart são bloqueados pelo proxy deste
+ambiente; os sprites vieram de um repositório público no GitHub
+(eckz/bevy_flair) que já os embarcava com a licença documentada. No porte
+Godot, o zip completo do pacote (140 sprites) baixa direto do site.
+
+## Rodada 6: cara de jogo de verdade (a régua de instrumentos caiu)
+
+Veto de playtest certeiro: "não tem cara de jogo real, tem cara de jogo
+teste — isso é normal nos jogos que a gente quer monetizar?". Não é. O
+padrão do gênero é: fase no topo, moedas numa pílula, e botões de ÍCONE
+com o preço num badge. Instrumento de pesquisa não aparece na cara do
+jogo — e continua medindo por baixo.
+
+- **Topo**: "Fase N" em gótica no centro (mov/par numa sublinha discreta),
+  pílula de moedas e pílula de sequência (🔥, só aparece quando existe),
+  menu ⚙ à esquerda.
+- **Menu ⚙**: os instrumentos moram ali — som, "Enjoei agora", "Parei
+  aqui". O cronômetro saiu da tela (segue medido no encerrar).
+- **Rodapé**: banner do Desafio do dia + 4 botões de ícone (desfazer,
+  frasco, dica, reiniciar) com badges de preço ("−2", "grátis: 1",
+  "▶ anúncio", "sem saída").
+- **Ícones**: [game-icons.net](https://game-icons.net) — SVGs embutidos,
+  tingidos por CSS.
+
+## Créditos de assets (obrigações de licença)
+
+- **Ícones**: [game-icons.net](https://game-icons.net) — crystal-ball,
+  standing-potion, cycle e cog de **Lorc**; anticlockwise-rotation e
+  two-coins de **Delapouite** — licença
+  [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/).
+- **Molduras de botão**: [Fantasy UI Borders](https://kenney.nl/assets/fantasy-ui-borders)
+  de **Kenney** — CC0 (crédito por cortesia).
+- **Fontes**: [Pirata One](https://fonts.google.com/specimen/Pirata+One) e
+  [Almendra](https://fonts.google.com/specimen/Almendra) (Google Fonts) —
+  licença OFL.
+
 ## O que fica pro porte (Godot)
 
 Anotado aqui pra não virar scope creep no protótipo:
