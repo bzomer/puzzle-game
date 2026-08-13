@@ -1053,44 +1053,50 @@ function contextoDeAudio() {
   } catch { return null; }
 }
 
-function nota(freq, { dur = 0.12, tipo = "sine", ganho = 0.07, quando = 0, desliza = 0 } = {}) {
+// Uma "tecla" de marimba sintetizada: fundamental + o parcial característico
+// do instrumento (~4×), que morre bem mais rápido que a fundamental. Ataque
+// macio, decaimento longo — instrumento, não efeito. Redesenho vindo de
+// playtest: a primeira versão usava bips crus de oscilador e a designer
+// vetou ("não gostei dos sons"); a direção escolhida foi musical minimalista.
+function tecla(freq, { dur = 0.55, ganho = 0.055, quando = 0 } = {}) {
   const ac = contextoDeAudio();
   if (!ac) return;
   try {
     const t0 = ac.currentTime + quando;
-    const osc = ac.createOscillator();
-    const g = ac.createGain();
-    osc.type = tipo;
-    osc.frequency.setValueAtTime(freq, t0);
-    if (desliza) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + desliza), t0 + dur);
-    g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(ganho, t0 + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
-    osc.connect(g).connect(ac.destination);
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.03);
+    for (const [mult, peso, decai] of [[1, 1, dur], [4, 0.18, dur * 0.22]]) {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * mult, t0);
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(ganho * peso, t0 + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0006, t0 + decai);
+      osc.connect(g).connect(ac.destination);
+      osc.start(t0);
+      osc.stop(t0 + decai + 0.05);
+    }
   } catch { /* áudio indisponível: segue mudo */ }
 }
 
-// O vocabulário inteiro do jogo — poucos sons, cada um com um significado só.
-const somSelecao = () => nota(440, { dur: 0.05, ganho: 0.03, tipo: "triangle" });
-// O "plop" sobe de tom conforme o destino enche — o clássico do gênero:
-// dá pra OUVIR o tubo completando sem olhar.
-const TONS_DESPEJO = [262, 330, 392, 494];
+// O vocabulário inteiro do jogo — poucos sons, um significado por som, tudo
+// na pentatônica de dó: qualquer sequência soa consonante, nunca "erra".
+// O despejo sobe a escala conforme o destino enche — dá pra OUVIR o tubo
+// completando sem olhar.
+const ESCALA_DESPEJO = [392, 440, 523, 659];   // sol4 lá4 dó5 mi5
+const somSelecao = () => tecla(1046, { dur: 0.12, ganho: 0.012 });
 const somDespejo = nivel =>
-  nota(TONS_DESPEJO[Math.min(nivel, TONS_DESPEJO.length) - 1] || 262,
-    { dur: 0.09, ganho: 0.06, tipo: "triangle", desliza: -60 });
+  tecla(ESCALA_DESPEJO[Math.min(nivel, ESCALA_DESPEJO.length) - 1] || 392);
 const somCompleto = quando => {
-  nota(660, { quando, dur: 0.11, ganho: 0.07 });
-  nota(990, { quando: quando + 0.09, dur: 0.16, ganho: 0.07 });
+  tecla(659, { quando, ganho: 0.06 });
+  tecla(1046, { quando: quando + 0.12, dur: 0.8, ganho: 0.05 });
 };
 const somVitoria = () =>
-  [523, 659, 784, 1047].forEach((f, i) =>
-    nota(f, { quando: 0.15 + i * 0.09, dur: 0.18, ganho: 0.08 }));
-const somDesfazer = () => nota(330, { dur: 0.12, ganho: 0.05, desliza: -140 });
+  [523, 659, 784, 1046].forEach((f, i) =>
+    tecla(f, { quando: 0.15 + i * 0.13, dur: 0.8, ganho: 0.05 }));
+const somDesfazer = () => tecla(330, { dur: 0.35, ganho: 0.04 });
 const somRecipiente = () => {
-  nota(220, { dur: 0.1, ganho: 0.06, tipo: "triangle" });
-  nota(275, { quando: 0.07, dur: 0.14, ganho: 0.06, tipo: "triangle" });
+  tecla(262, { dur: 0.5, ganho: 0.05 });
+  tecla(392, { quando: 0.1, dur: 0.6, ganho: 0.05 });
 };
 
 // Em TOQUE, pointerdown não conta como "ativação do usuário" pra política
@@ -1104,9 +1110,9 @@ document.getElementById("btSom").onclick = e => {
   somLigado = !somLigado;
   e.currentTarget.textContent = somLigado ? "🔊" : "🔇";
   e.currentTarget.setAttribute("aria-label", somLigado ? "Som ligado" : "Som desligado");
-  // O clique é gesto de verdade: liga o som E o confirma com um blip —
+  // O clique é gesto de verdade: liga o som E o confirma com uma tecla —
   // sem isso, "liguei?" só se responde no próximo movimento.
-  if (somLigado) nota(523, { dur: 0.1, ganho: 0.06 });
+  if (somLigado) tecla(659, { ganho: 0.05 });
   salvar();
 };
 
