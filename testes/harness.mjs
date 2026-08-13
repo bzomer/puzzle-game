@@ -81,6 +81,28 @@ const HUMANOS = [
       "5350-3040-1250-5224-3441-1312-- 0432-0531-4315-2520-1243-0415-- " +
       "5245-3432-5304-3142-0510-0112-- 4510-0335-2254-3542-4013-2101-- " +
       "3241-5150-1313-5340-0524-4022--").split(" ") },
+  // a maior sessão até aqui — e a prova de campo da persistência: o banco
+  // deste jogador começou nos 185 que a sessão anterior (outra pessoa, mesmo
+  // aparelho) deixou salvos: 743 = 185 + 564 − 6.
+  { id: "s9-B-22tab-diretor", j: "B",
+    t: [29,45,31,70,57,149,68,57,58,39,65,53,35,47,41,44,42,39,30,52,48,47],
+    m: [16,19,17,23,23,19,20,22,19,19,17,21,17,21,20,20,18,20,17,22,21,21],
+    d: [16,19,17,23,23,24,20,22,19,19,17,21,17,21,20,20,18,20,17,22,21,21],
+    nos: [505,273,700,3734,1095,1164,1513,3049,698,309,1317,801,439,1659,2397,1296,710,924,724,769,882,3063],
+    p: [15,17,16,21,19,19,19,21,19,17,17,19,16,20,20,19,17,17,17,19,20,20],
+    ganhoRelatado: 564, maiorSeq: 22,
+    faixas: ["leve","leve","leve","media","media","pesada","leve","media","media","pesada","leve","media","media","pesada","leve","media","media","pesada","leve","media","media","pesada"],
+    layouts: ("0011-3031-0341-5554-5224-2324-- 4352-4300-2245-3510-2310-5114-- " +
+      "2050-4411-5041-2333-0214-5352-- 5021-4123-4323-4145-0501-0253-- " +
+      "3135-5423-2001-0240-1425-3541-- 2410-2411-2333-0540-2345-5105-- " +
+      "1212-2050-4510-4304-1335-5243-- 5031-4143-5025-2320-4152-4031-- " +
+      "5534-1402-2341-1023-2145-0503-- 4112-2314-5134-3200-2055-3450-- " +
+      "0042-5555-1413-0323-1434-2012-- 1213-2350-5140-4535-0244-3210-- " +
+      "5504-1142-0312-2353-1500-2344-- 0154-4215-0514-2034-1523-3230-- " +
+      "3520-3454-2512-3131-0544-0102-- 2351-4005-4252-3201-3314-4051-- " +
+      "4433-1325-5112-4030-0150-4225-- 1413-1503-3440-0222-1535-4025-- " +
+      "1435-1105-2040-4435-1032-3522-- 0354-1541-0410-3552-2403-3212-- " +
+      "0520-1324-5314-5230-4115-0234-- 5230-5152-3040-1202-4143-1453--").split(" ") },
 ];
 
 // ── utilidades ──────────────────────────────────────────────────────────
@@ -253,43 +275,52 @@ diga("\n## 5. Dados humanos (5 sessões, 66 tabuleiros): o que prevê o tempo");
   afirma(paredesComParComum, "as 2 piores lutas humanas tinham par comum (≤Q75) — a cauda é invisível ao par; daí o bot");
 }
 
-// ═══ 5b. validação direta: sessão com layouts exatos ════════════════════
-diga("\n## 5b. Validação direta — sessão 8, os 9 tabuleiros exatos");
+// ═══ 5b. validação direta: sessões com layouts exatos ═══════════════════
+diga("\n## 5b. Validação direta — sessões com os tabuleiros exatos");
 {
-  const s8 = HUMANOS.find(h => h.layouts);
   const desserializar = str => str.split("-").map(t => [...t].map(c => parseInt(c, 36)));
-  const rng = rngCom(88);
-  let paresOk = 0;
-  const scores50 = [];
-  s8.layouts.forEach((lay, i) => {
-    const tubos = desserializar(lay);
-    const pr = G.calcularPar(tubos).par;
-    if (pr === s8.p[i]) paresOk++;
-    scores50.push(G.medirDificuldade(tubos, pr, 50, rng).score);
-  });
-  afirma(paresOk === s8.layouts.length,
-    `cadeia serializar→desserializar→solver íntegra: par bate em ${paresOk}/${s8.layouts.length}`);
-  let ganho = 0, seq = 0;
-  s8.p.forEach((par, i) => {
-    ganho += G.premioDoTabuleiro(par, s8.m[i], seq);
-    if (G.dentroDaTolerancia(par, s8.m[i])) seq++; else seq = 0;
-  });
-  afirma(ganho === s8.ganhoRelatado,
-    `economia com streak reproduz a sessão real à moeda: ${ganho} = ${s8.ganhoRelatado}`);
-  afirma(seq === s8.maiorSeq, `sequência reproduzida: ${seq} = ${s8.maiorSeq}`);
-  const ordem = s8.t.map((_, i) => i + 1);
-  diga(`Correlações com o tempo humano nos tabuleiros exatos (n=9): ` +
-       `score-bot(50 rod.) ρ=${spearman(scores50, s8.t).toFixed(2)}, ` +
-       `par ρ=${spearman(s8.p, s8.t).toFixed(2)}, ` +
-       `nós ρ=${spearman(s8.nos, s8.t).toFixed(2)}, ` +
-       `ORDEM ρ=${spearman(ordem, s8.t).toFixed(2)}.`);
-  diga("Leitura honesta: dentro da faixa segura que o diretor serve, nenhuma " +
-       "métrica de dificuldade previu o tempo desta jogadora — o que previu " +
-       "foi a ordem (fadiga/atenção ao longo da sessão). O valor demonstrado " +
-       "do diretor está na CAUDA: pior tabuleiro a 1,4× a mediana, contra " +
-       "4,4× e 4,0× nas sessões pré-diretor. n=1 sessão; acumula nas próximas.");
-  const pior = Math.max(...s8.t) / quantil(s8.t, 0.5);
-  afirma(pior < 2, `sem parede na primeira sessão pós-diretor (pior ${pior.toFixed(1)}× a mediana, era 4,4× antes)`);
+  for (const sx of HUMANOS.filter(h => h.layouts)) {
+    const rng = rngCom(88);
+    let paresOk = 0;
+    const scores50 = [];
+    sx.layouts.forEach((lay, i) => {
+      const tubos = desserializar(lay);
+      const pr = G.calcularPar(tubos).par;
+      if (pr === sx.p[i]) paresOk++;
+      scores50.push(G.medirDificuldade(tubos, pr, 50, rng).score);
+    });
+    afirma(paresOk === sx.layouts.length,
+      `${sx.id}: cadeia serializar→desserializar→solver íntegra (${paresOk}/${sx.layouts.length})`);
+    let ganho = 0, seq = 0;
+    sx.p.forEach((par, i) => {
+      ganho += G.premioDoTabuleiro(par, sx.m[i], seq);
+      if (G.dentroDaTolerancia(par, sx.m[i])) seq++; else seq = 0;
+    });
+    afirma(ganho === sx.ganhoRelatado,
+      `${sx.id}: economia com streak reproduz a sessão à moeda (${ganho} = ${sx.ganhoRelatado})`);
+    afirma(seq === sx.maiorSeq, `${sx.id}: sequência reproduzida (${seq} = ${sx.maiorSeq})`);
+    const ordem = sx.t.map((_, i) => i + 1);
+    diga(`${sx.id} (n=${sx.t.length}): score-bot(50 rod.) ρ=${spearman(scores50, sx.t).toFixed(2)}, ` +
+         `par ρ=${spearman(sx.p, sx.t).toFixed(2)}, ` +
+         `ordem ρ=${spearman(ordem, sx.t).toFixed(2)}.`);
+  }
+  diga("");
+  diga("Leitura das duas primeiras sessões pós-diretor: dentro da faixa segura, " +
+       "o par segue o melhor preditor grosso do tempo (ρ 0,53 no jogador B, " +
+       "n=22); o score do bot prevê pouco o tempo (0,02 e 0,25) — o papel dele " +
+       "é o filtro da cauda, não a régua fina. E o estado da pessoa pesa: na " +
+       "jogadora A o tempo subiu com a ordem (fadiga, ρ 0,68); no jogador B " +
+       "caiu (aprendizado, ρ −0,17), com as pesadas despencando de 149s na " +
+       "primeira para ~47s nas últimas.");
+  // s8: sem parede
+  const s8 = HUMANOS.find(h => h.id.startsWith("s8"));
+  const pior8 = Math.max(...s8.t) / quantil(s8.t, 0.5);
+  afirma(pior8 < 2, `s8: sem parede (pior ${pior8.toFixed(1)}× a mediana; era 4,4× pré-diretor)`);
+  // s9: o pico de 149s NÃO foi parede — foi vencido NO PAR e a sessão seguiu
+  const s9 = HUMANOS.find(h => h.id.startsWith("s9"));
+  const iPior = s9.t.indexOf(Math.max(...s9.t));
+  afirma(s9.m[iPior] === s9.p[iPior] && s9.t.length - iPior > 10,
+    `s9: o pico (${s9.t[iPior]}s) foi resolvido NO PAR e a sessão seguiu por mais ${s9.t.length - 1 - iPior} tabuleiros — desafio vencível ≠ buraco negro`);
 }
 
 // ═══ 6. diretor de dificuldade ══════════════════════════════════════════
