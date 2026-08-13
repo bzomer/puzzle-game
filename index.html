@@ -1078,14 +1078,15 @@ function tecla(freq, { dur = 0.55, ganho = 0.055, quando = 0 } = {}) {
   } catch { /* áudio indisponível: segue mudo */ }
 }
 
-// O vocabulário inteiro do jogo — poucos sons, um significado por som, tudo
-// na pentatônica de dó: qualquer sequência soa consonante, nunca "erra".
-// O despejo sobe a escala conforme o destino enche — dá pra OUVIR o tubo
-// completando sem olhar.
-const ESCALA_DESPEJO = [392, 440, 523, 659];   // sol4 lá4 dó5 mi5
-const somSelecao = () => tecla(1046, { dur: 0.12, ganho: 0.012 });
+// O vocabulário inteiro do jogo — poucos sons, um significado por som. As
+// NOTAS (pentatônica de dó) são só dos momentos de conquista: tubo completo,
+// prêmio, fim de fase. Os sons frequentes são outra família, de propósito —
+// playtest vetou nota musical em cada movimento ("esses dois sons eu não
+// gostei"): a seleção ficou MUDA (o tubo erguendo é o feedback) e o despejo
+// virou percussão abafada — um toc de madeira com feltro, curto e grave, que
+// sobe um nadinha conforme o destino enche. Informação, não melodia.
 const somDespejo = nivel =>
-  tecla(ESCALA_DESPEJO[Math.min(nivel, ESCALA_DESPEJO.length) - 1] || 392);
+  tecla(150 + 20 * (Math.min(nivel, 4) - 1), { dur: 0.09, ganho: 0.05 });
 const somCompleto = quando => {
   tecla(659, { quando, ganho: 0.06 });
   tecla(1046, { quando: quando + 0.12, dur: 0.8, ganho: 0.05 });
@@ -1128,7 +1129,7 @@ function toque(ev) {
   ev.preventDefault();
 
   if (jogo.selecionado === -1) {
-    if (jogo.tubos[i].length) { jogo.selecionado = i; somSelecao(); desenhar(); }
+    if (jogo.tubos[i].length) { jogo.selecionado = i; desenhar(); }
     return;
   }
   if (jogo.selecionado === i) { jogo.selecionado = -1; desenhar(); return; }

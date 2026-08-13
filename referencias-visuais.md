@@ -63,14 +63,18 @@ ataque macio, decaimento longo), tudo na **pentatônica de dó** — qualquer
 sequência soa consonante, nunca "erra". Vocabulário mínimo, um significado
 por som:
 
+Segunda rodada de veto: nota musical em cada movimento cansa — os sons
+FREQUENTES viraram outra família (percussão abafada / silêncio), e as notas
+ficaram só nos momentos de conquista.
+
 | Som | Desenho |
 | --- | --- |
-| Despejo | tecla que **sobe a escala conforme o tubo enche** (dá pra ouvir o tubo completando sem olhar — o clássico do gênero) |
+| Despejo | percussão abafada ("toc" de madeira com feltro), grave e curtíssima, subindo um nadinha conforme o tubo enche — informação, não melodia |
+| Seleção | **mudo** — o tubo erguendo é o feedback |
 | Tubo completo | duas teclas (mi5 → dó6), sincronizadas com o flash (esperam o bloco assentar) |
 | Tabuleiro resolvido | arpejo pentatônico calmo — o tubo final cede a vez |
 | Desfazer | tecla grave curta |
 | Recipiente extra | duas teclas graves ("algo se instalou") |
-| Seleção | tecla aguda quase inaudível |
 
 Botão 🔊/🔇 na fileira da loja; a preferência persiste no save. Se o
 navegador bloquear áudio (autoplay), o jogo segue mudo sem reclamar. No
