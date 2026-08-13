@@ -24,8 +24,8 @@ const codigo = puro.slice(0, corte) + `
 export { CONFIG, corrida, podeDespejar, despejar, resolvido, emprensado,
   heuristica, chave, calcularPar, distribuir, gerar, premioDoTabuleiro,
   custoDesfazerPuro, dentroDaTolerancia, serializar, jogadaDoBot,
-  medirDificuldade, faixaDoTabuleiro, gerarDirigido, producaoAcumulada,
-  premioFinal };`;
+  medirDificuldade, faixaDoTabuleiro, gerarDirigido, premioFinal,
+  tabuleiroDoDia, dicaOtima, hashDeTexto, rngDeSemente };`;
 const G = await import("data:text/javascript," + encodeURIComponent(codigo));
 
 // ── rng com semente (mulberry32): os números do relatório são reprodutíveis
@@ -420,18 +420,9 @@ diga("\n## 7. Economia: 400 sessões × 30 tabuleiros (jogador sintético)");
   afirma(inflacao < 1.9, "streak limitado: infla a renda em menos de 90% mesmo pra jogador ótimo");
   afirma(maxMult <= G.CONFIG.SEQUENCIA_MAX + 1e-9, "multiplicador nunca passa do teto");
 
-  // produção: a curva de retorno tem que PIORAR com o nível
-  const payback = n => Math.round(G.CONFIG.CUSTO_MELHORIA *
-    Math.pow(G.CONFIG.CUSTO_CRESCIMENTO, n - 1)) /
-    (n * G.CONFIG.PRODUCAO_POR_HORA * G.CONFIG.TETO_OFFLINE_HORAS);
-  diga(`Payback (ausências de 8 h até pagar o nível): ` +
-       [1, 2, 3, 4, 5].map(n => `n${n}=${payback(n).toFixed(1)}`).join(" · "));
-  afirma(payback(5) > payback(1), "curva de retorno da produção piora no fim (teto natural)");
-  afirma(payback(2) < payback(1), "o nível 2 rende MELHOR que o 1 — gancho deliberado da segunda compra");
-  afirma(payback(3) < payback(4) && payback(4) < payback(5), "do nível 2 em diante o retorno só piora (monótono)");
-  const passiva8h = 3 * G.CONFIG.PRODUCAO_POR_HORA * G.CONFIG.TETO_OFFLINE_HORAS;
-  afirma(passiva8h < rendaMedia * 10,
-    `passiva não supera o jogo: 8 h ausente no nível 3 (${passiva8h}) < 10 tabuleiros jogados (~${Math.round(rendaMedia * 10)})`);
+  // (a produção passiva foi aposentada pelos dados: 0 compras em 3 sessões —
+  //  os testes dela saíram junto; o gancho de volta agora é o desafio do dia,
+  //  coberto na bateria 9)
 }
 
 // ═══ 8. regressões pontuais ═════════════════════════════════════════════
@@ -460,16 +451,37 @@ diga("\n## 8. Regressões dos bugs achados em playtest");
     "o resgate custa mais que um tabuleiro bom rende — é socorro, não rotina");
 }
 
-// ═══ 9. persistência: a conta da volta ══════════════════════════════════
-diga("\n## 9. Produção acumulada (a conta que traz a pessoa de volta)");
+// ═══ 9. desafio do dia e dica ótima (o gancho de volta e o rewarded) ════
+diga("\n## 9. Desafio do dia e dica ótima");
 {
-  const H = 3600000;
-  afirma(G.producaoAcumulada(3, 24 * H) === 72,
-    "teto de 8 h respeitado: 24 h fora no nível 3 rendem o mesmo que 8 h (72)");
-  afirma(G.producaoAcumulada(0, 8 * H) === 0, "nível 0 nunca produz — a compra se ensina sozinha");
-  afirma(G.producaoAcumulada(2, 0.5 * H) === 3, "meia hora no nível 2 rende 3 (produção é contínua, não por dia)");
-  afirma(G.producaoAcumulada(1, 8 * H) === 24, "bate com a tabela da proposta: nível 1, 8 h → 24");
-  afirma(G.producaoAcumulada(1, -5000) === 0, "relógio que anda pra trás não rende (clock skew)");
+  // determinístico: o MESMO tabuleiro pro mundo inteiro no mesmo dia
+  const d1 = G.tabuleiroDoDia("2026-08-13");
+  const d1b = G.tabuleiroDoDia("2026-08-13");
+  const d2 = G.tabuleiroDoDia("2026-08-14");
+  afirma(G.serializar(d1.tubos) === G.serializar(d1b.tubos),
+    "mesmo dia → mesmo tabuleiro, sempre (determinístico)");
+  afirma(G.serializar(d1.tubos) !== G.serializar(d2.tubos),
+    "dia diferente → tabuleiro diferente");
+  afirma(d1.par > 0 && d1.dificuldade.score <= G.CONFIG.TETO_PAREDE,
+    `o desafio é jogável e nunca é parede (par ${d1.par}, score ${d1.dificuldade.score.toFixed(2)})`);
+  afirma(d1.faixa === "desafio", "o desafio se identifica como desafio no registro");
+
+  // a dica é ótima DE VERDADE: seguir dicas resolve exatamente no par
+  const rng = rngCom(99);
+  let otimas = 0;
+  for (let r = 0; r < 3; r++) {
+    const { tubos, par } = G.gerar(rng);
+    let T = tubos.map(t => t.slice()), passos = 0, ok = true;
+    while (!G.resolvido(T) && passos <= par) {
+      const mv = G.dicaOtima(T);
+      if (!mv) { ok = false; break; }
+      G.despejar(T, mv[0], mv[1]);
+      passos++;
+    }
+    if (ok && G.resolvido(T) && passos === par) otimas++;
+  }
+  afirma(otimas === 3,
+    `seguir só dicas resolve exatamente no par em 3/3 tabuleiros (deu ${otimas}/3) — a dica é o movimento ótimo, não um palpite`);
 }
 
 // ── fecho ───────────────────────────────────────────────────────────────

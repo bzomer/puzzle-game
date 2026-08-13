@@ -11,7 +11,7 @@ Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica t
   ✓ par confirmado descendo o gradiente em 6/6 tabuleiros (deu 6/6)
 
 ## 3. Gerador (200 tabuleiros, 6 cores)
-Tempo: 4946 ms no total (24.7 ms/tabuleiro).
+Tempo: 3850 ms no total (19.3 ms/tabuleiro).
 Par: mín 13, mediana 18, máx 21.
   ✓ nenhum tabuleiro insolúvel ou trivial servido
   ✓ geração média abaixo de 150 ms (não trava navegador)
@@ -68,11 +68,6 @@ Sequência infla a renda total em 82% (multiplicador máximo atingido: ×2.0)
   ✓ renda média por tabuleiro na escala legível (6–30)
   ✓ streak limitado: infla a renda em menos de 90% mesmo pra jogador ótimo
   ✓ multiplicador nunca passa do teto
-Payback (ausências de 8 h até pagar o nível): n1=1.7 · n2=1.3 · n3=1.4 · n4=1.7 · n5=2.2
-  ✓ curva de retorno da produção piora no fim (teto natural)
-  ✓ o nível 2 rende MELHOR que o 1 — gancho deliberado da segunda compra
-  ✓ do nível 2 em diante o retorno só piora (monótono)
-  ✓ passiva não supera o jogo: 8 h ausente no nível 3 (72) < 10 tabuleiros jogados (~254)
 
 ## 8. Regressões dos bugs achados em playtest
   ✓ bancarrota pré-1º tabuleiro: desfazer nunca cobra antes da primeira vitória
@@ -86,12 +81,12 @@ Payback (ausências de 8 h até pagar o nível): n1=1.7 · n2=1.3 · n3=1.4 · n
   ✓ sem recipiente, o prêmio segue a fórmula normal
   ✓ o resgate custa mais que um tabuleiro bom rende — é socorro, não rotina
 
-## 9. Produção acumulada (a conta que traz a pessoa de volta)
-  ✓ teto de 8 h respeitado: 24 h fora no nível 3 rendem o mesmo que 8 h (72)
-  ✓ nível 0 nunca produz — a compra se ensina sozinha
-  ✓ meia hora no nível 2 rende 3 (produção é contínua, não por dia)
-  ✓ bate com a tabela da proposta: nível 1, 8 h → 24
-  ✓ relógio que anda pra trás não rende (clock skew)
+## 9. Desafio do dia e dica ótima
+  ✓ mesmo dia → mesmo tabuleiro, sempre (determinístico)
+  ✓ dia diferente → tabuleiro diferente
+  ✓ o desafio é jogável e nunca é parede (par 17, score 1.40)
+  ✓ o desafio se identifica como desafio no registro
+  ✓ seguir só dicas resolve exatamente no par em 3/3 tabuleiros (deu 3/3) — a dica é o movimento ótimo, não um palpite
 
 ---
 **Todas as asserções passaram.**

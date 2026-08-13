@@ -291,21 +291,13 @@
 
   <div class="loja">
     <div style="display:flex; gap:8px">
-      <button id="btMelhoria">Produção</button>
+      <button id="btDesafio">★ Desafio do dia</button>
       <button id="btRecipiente">Recipiente</button>
+      <button id="btDica">💡 Dica</button>
     </div>
-    <!-- Comprar mudava só o texto do botão — nenhum sinal de que a compra fez
-         algo. Uma sessão gastou 104 (nível 2) sem nenhum retorno visível
-         durante o jogo, porque o único lugar que mostra produção é a tela de
-         volta, e ela só era alcançável pelo veredito no fim da sessão. -->
-    <p class="rot" id="statusProducao"
-       style="text-align:left; text-transform:none; letter-spacing:0; margin:6px 0 0"></p>
-    <button id="btPreverProducao"
-      style="margin-top:6px; font-size:11.5px; padding:7px; border-style:dashed;
-             color:var(--ink-dim); border-color:var(--line)">
-      Ver quanto renderia se eu saísse agora
-    </button>
   </div>
+
+  <div class="marcador">  </div>
 
   <div class="marcador">
     <button id="btEnjoei">Enjoei agora — marcar e continuar jogando</button>
@@ -315,38 +307,6 @@
     <button id="btDesfazer" disabled>Desfazer</button>
     <button id="btReiniciar">Reiniciar</button>
     <button id="btParei">Parei aqui</button>
-  </div>
-</div>
-
-<!-- Tela de retorno: o acúmulo offline -->
-<div class="tela" id="telaVolta">
-  <div class="folha">
-    <h1>Tela 2 — a volta</h1>
-    <h2 id="voltaTitulo">Enquanto você esteve fora</h2>
-    <div>
-      <div class="grande" id="voltaMoeda">0</div>
-      <p style="margin-top:6px" id="voltaLinha">moedas acumuladas</p>
-    </div>
-
-    <div>
-      <span class="rot" style="margin-bottom:8px">Simular ausência de</span>
-      <div class="segs" id="segsAusencia">
-        <button data-h="0.5" aria-pressed="false">30 min</button>
-        <button data-h="2"   aria-pressed="false">2 h</button>
-        <button data-h="8"   aria-pressed="true">8 h</button>
-        <button data-h="24"  aria-pressed="false">24 h</button>
-      </div>
-    </div>
-
-    <button class="forte" id="btDobrar">▶ Assistir e levar 2×</button>
-    <button id="btVoltarJogo">Voltar ao tabuleiro</button>
-
-    <p class="nota">
-      O teto é de <strong>8 horas</strong> (<code>TETO_OFFLINE_HORAS</code>). Compare
-      <strong>8 h</strong> com <strong>24 h</strong>: se o balde cheio depois de um dia
-      inteiro fora não frustrar, o teto está calibrado. Se frustrar, ele é alto demais —
-      ou precisa aparecer na tela antes de o jogador sair.
-    </p>
   </div>
 </div>
 
@@ -363,7 +323,6 @@
 
     <table id="fimTabela"></table>
 
-    <button class="forte" id="btVerVolta">Ver a tela de volta</button>
     <button id="btCopiar">Copiar os números</button>
     <button id="btDeNovo">Rodar outra sessão</button>
     <button id="btZerar">Zerar tudo — apaga o progresso salvo</button>
@@ -411,13 +370,13 @@ const CONFIG = {
   // acabou abandonado. Preserva o anti-força-bruta (busca longa ainda paga) e
   // remove a espiral de ficar sem saída por falta de caixa.
   DESFAZER_GRATIS: 2,
-  // A única melhoria comprável. Existe pra que a moeda tenha ralo: preço
-  // cravado em moeda que não compra nada não dói em escala nenhuma, e foi o
-  // que aconteceu nas duas primeiras sessões com desfazer pago.
-  CUSTO_MELHORIA: 40,      // ~3 tabuleiros bons; 20 desfazer
-  CUSTO_CRESCIMENTO: 1.6,  // por nível
-  PRODUCAO_POR_HORA: 3,    // por nível, limitado pelo teto de horas
-  TETO_OFFLINE_HORAS: 8,
+  // Produção passiva aposentada pelos dados: 0 compras em 3 sessões — moeda
+  // que produz moeda é ciclo fechado. O gancho de volta do gênero é outro,
+  // e as referências convergem (Water Sort, Ball Sort, Daily Ball): o
+  // DESAFIO DO DIA — um tabuleiro especial por dia de calendário, igual pra
+  // todo mundo, que premia com o item que o playtest provou desejado.
+  DESAFIO_BONUS_MOEDAS: 25,
+  DESAFIO_BONUS_RECIPIENTES: 1,
   // Sequência: tabuleiros seguidos dentro da tolerância aumentam o prêmio do
   // PRÓXIMO em 10%, com teto ×2. Evidência: recompensa em camadas tem caso
   // documentado de +45% de D30 (GameAnalytics), e a própria doc do portal —
@@ -461,6 +420,8 @@ const jogo = {
   movimentos: 0,
   desfazerNoTabuleiro: 0,
   recipienteComprado: false,
+  dica: null,
+  ehDesafio: false,
   // Despejos NUNCA decrementa. `movimentos` mede o tamanho da solução final;
   // este mede o esforço. Com 51 desfazer numa sessão, os dois divergiram 12
   // pontos percentuais — e sem separá-los a métrica muda de significado
@@ -486,8 +447,9 @@ const sessao = {
   reinicios: 0,
   ganho: 0,
   gasto: 0,      // desfazer
-  investido: 0,  // melhorias
-  nivel: 0,
+  dicas: 0,
+  anuncios: 0,
+  desafioFeito: false,
   sequencia: 0,
   maiorSequencia: 0,
   layouts: [],
@@ -696,14 +658,6 @@ function dentroDaTolerancia(par, movimentos) {
   return par > 0 && movimentos <= Math.round(par * CONFIG.TOLERANCIA_PAR);
 }
 
-// Produção offline de verdade: nível × taxa × horas fora, com o teto.
-// Pura de propósito — é a conta que decide se a pessoa tem motivo de voltar,
-// então ela mora no harness, não só no navegador.
-function producaoAcumulada(nivel, msFora) {
-  const horas = Math.min(Math.max(0, msFora) / 3600000, CONFIG.TETO_OFFLINE_HORAS);
-  return Math.round(nivel * CONFIG.PRODUCAO_POR_HORA * horas);
-}
-
 // Tabuleiro inicial como texto compacto — vai no resumo copiável, pra que
 // sessões humanas futuras carreguem os tabuleiros exatos e a validação
 // bot × humano possa ser direta, não por transitividade.
@@ -791,6 +745,65 @@ function gerarDirigido(indice, rng = Math.random) {
   return reserva || qualquer;
 }
 
+/* ─────────────── desafio do dia e dica (puros) ───────────────
+   O gancho de volta é o padrão do gênero: um tabuleiro por dia de
+   calendário, determinístico — o MESMO pro mundo inteiro — na faixa pesada.
+   E a dica é ótima de verdade: o próximo movimento que reduz o par em 1,
+   direto do A*. Referências dos jogos líderes: Undo/Hint/Extra Bottle como
+   trio de power-ups, dica e recipiente via rewarded, desafio diário
+   premiando com os próprios itens.                                        */
+
+function hashDeTexto(texto) {
+  let h = 2166136261 >>> 0;
+  for (const c of texto) {
+    h ^= c.codePointAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function rngDeSemente(semente) {
+  let a = semente >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function tabuleiroDoDia(dia) {
+  const rng = rngDeSemente(hashDeTexto("desafio-" + dia));
+  const alvo = CONFIG.FAIXAS.pesada;
+  let reserva = null, dist = Infinity;
+  for (let t = 0; t < 10; t++) {
+    const cand = gerar(rng);
+    if (cand.par <= 0) continue;
+    const dif = medirDificuldade(cand.tubos, cand.par, 12, rng);
+    if (dif.score > CONFIG.TETO_PAREDE) continue;
+    const c = { ...cand, dificuldade: dif, faixa: "desafio" };
+    const d = dif.score < alvo.min ? alvo.min - dif.score
+            : dif.score > alvo.max ? dif.score - alvo.max : 0;
+    if (d === 0) return c;
+    if (d < dist) { dist = d; reserva = c; }
+  }
+  return reserva;
+}
+
+function dicaOtima(tubos) {
+  const alvo = calcularPar(tubos).par;
+  if (alvo <= 0) return null;
+  for (let i = 0; i < tubos.length; i++) {
+    for (let j = 0; j < tubos.length; j++) {
+      if (!podeDespejar(tubos, i, j)) continue;
+      const c = tubos.map(t => t.slice());
+      despejar(c, i, j);
+      if (calcularPar(c).par === alvo - 1) return [i, j];
+    }
+  }
+  return null;
+}
+
 /* ═══════════ FIM DA LÓGICA PURA — daqui pra baixo é DOM.
    Os testes automáticos (testes/harness.mjs) importam só o que está acima
    deste marcador; mover lógica pra baixo dele é tirá-la dos testes. ═══════ */
@@ -871,9 +884,10 @@ function desenhar() {
       ctx.fillRect(x + 2, cy + 1, L.larguraTubo - 4, L.alturaCamada - 2);
     });
 
-    // a borda
-    ctx.strokeStyle = sel ? selec : linha;
-    ctx.lineWidth = sel ? 2 : 1;
+    // a borda (a dica destaca origem e destino do movimento ótimo)
+    const emDica = jogo.dica && (jogo.dica[0] === i || jogo.dica[1] === i);
+    ctx.strokeStyle = emDica ? corDe("--atencao") : sel ? selec : linha;
+    ctx.lineWidth = emDica ? 3 : sel ? 2 : 1;
     ctx.strokeRect(x + 0.5, y + 0.5, L.larguraTubo - 1, L.alturaTubo - 1);
   });
 }
@@ -893,6 +907,7 @@ function tuboEm(px, py) {
 
 function toque(ev) {
   if (jogo.travado || sessao.encerrada) return;
+  if (jogo.dica) jogo.dica = null;
   const r = cv.getBoundingClientRect();
   const pt = ev.changedTouches ? ev.changedTouches[0] : ev;
   const i = tuboEm(pt.clientX - r.left, pt.clientY - r.top);
@@ -925,8 +940,8 @@ cv.addEventListener("pointerdown", toque);
 
 /* ─────────────── ciclo de tabuleiro ─────────────── */
 
-function novoTabuleiro() {
-  const servido = gerarDirigido(sessao.completados);
+function novoTabuleiro(especial) {
+  const servido = especial || gerarDirigido(sessao.completados);
   jogo.tubos = servido.tubos;
   jogo.par = servido.par;
   jogo.faixa = servido.faixa || "?";
@@ -941,6 +956,8 @@ function novoTabuleiro() {
   jogo.despejos = 0;
   jogo.desfazerNoTabuleiro = 0;
   jogo.recipienteComprado = false;
+  jogo.dica = null;
+  jogo.ehDesafio = !!especial;
   jogo.selecionado = -1;
   jogo.historico = [];
   jogo.travado = false;
@@ -980,6 +997,12 @@ function concluir() {
   } else {
     sessao.sequencia = 0;
   }
+  if (jogo.ehDesafio) {
+    sessao.ganho += CONFIG.DESAFIO_BONUS_MOEDAS;
+    estoqueRecipientes += CONFIG.DESAFIO_BONUS_RECIPIENTES;
+    diaDesafioFeito = diaHoje();
+    sessao.desafioFeito = true;
+  }
   salvar();
 
   // Sem cap. O alvo de 10 é o critério de morte, não o fim da sessão —
@@ -993,16 +1016,23 @@ function concluir() {
 // meta idle ("a pessoa volta?") era intestável: a produção passiva não
 // sobrevivia pra ninguém voltar PARA ela.
 let banco = CONFIG.MOEDA_INICIAL;
-let pendenteColeta = 0;
+let estoqueRecipientes = 0;   // vindos do desafio do dia / anúncio
+let diaDesafioFeito = null;   // "aaaa-mm-dd" do último desafio completado
 
-const saldo = () => banco + sessao.ganho - sessao.gasto -
-  sessao.investido - sessao.gastoRecipientes;
+function diaHoje() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+    "-" + String(d.getDate()).padStart(2, "0");
+}
+
+const saldo = () => banco + sessao.ganho - sessao.gasto - sessao.gastoRecipientes;
 
 const CHAVE_SAVE = "sort-idle-v1";
 function salvar() {
   try {
     localStorage.setItem(CHAVE_SAVE, JSON.stringify({
-      banco: saldo(), nivel: sessao.nivel, quando: Date.now(),
+      banco: saldo(), estoque: estoqueRecipientes,
+      diaDesafio: diaDesafioFeito, quando: Date.now(),
     }));
   } catch { /* aba privada: o jogo segue, só não persiste */ }
 }
@@ -1011,28 +1041,21 @@ function carregarSave() {
   catch { return null; }
 }
 
-const custoMelhoria = () =>
-  Math.round(CONFIG.CUSTO_MELHORIA * Math.pow(CONFIG.CUSTO_CRESCIMENTO, sessao.nivel));
-
-// Antes do primeiro tabuleiro completado NUNCA cobra. Sem isso, uma sequência
-// de desfazer no primeiro tabuleiro da sessão inteira drena o estoque inicial
-// e trava o jogador antes de ele ter ganhado uma moeda sequer — foi
-// exatamente o que aconteceu numa sessão real: 7 desfazer, 0 tabuleiros
-// completados, saldo zerado. O colchão de "2 grátis por tabuleiro" pressupõe
-// renda de tabuleiros anteriores; no primeiro tabuleiro da sessão essa renda
-// não existe, então o colchão sozinho não bastava.
 function custoDesfazerAtual() {
   return custoDesfazerPuro(sessao.completados, jogo.desfazerNoTabuleiro);
 }
 
 function atualizarHud() {
-  const bm = document.getElementById("btMelhoria");
-  const custo = custoMelhoria();
-  bm.disabled = saldo() < custo || sessao.encerrada;
-  bm.textContent = sessao.nivel === 0
-    ? "Comprar produção passiva — " + custo
-    : "Produção nível " + sessao.nivel + " (" +
-      sessao.nivel * CONFIG.PRODUCAO_POR_HORA + "/h) — subir por " + custo;
+  const bdes = document.getElementById("btDesafio");
+  const desafioFeitoHoje = diaDesafioFeito === diaHoje();
+  bdes.disabled = desafioFeitoHoje || sessao.encerrada || jogo.ehDesafio;
+  bdes.textContent = desafioFeitoHoje ? "Desafio ✓ — amanhã tem outro"
+    : jogo.ehDesafio ? "★ Desafio em andamento…"
+    : "★ Desafio do dia";
+  bdes.classList.toggle("forte", !desafioFeitoHoje && !jogo.ehDesafio && !sessao.encerrada);
+
+  const bdi = document.getElementById("btDica");
+  bdi.disabled = jogo.travado || sessao.encerrada;
 
   const md = document.getElementById("hudMoeda");
   md.textContent = saldo().toLocaleString("pt-BR");
@@ -1047,12 +1070,6 @@ function atualizarHud() {
     ? sessao.sequencia + "×" + multSeq.toFixed(1).replace(".", ",") : "—";
   sq.className = "val" + (sessao.sequencia >= 3 ? " bom" : "");
 
-  // A confirmação de que a compra fez algo, sem precisar sair do jogo.
-  document.getElementById("statusProducao").textContent = sessao.nivel > 0
-    ? "Nível " + sessao.nivel + " ativo: rende " +
-      (sessao.nivel * CONFIG.PRODUCAO_POR_HORA) + " moedas por hora ausente " +
-      "(teto " + CONFIG.TETO_OFFLINE_HORAS + " h) — o efeito é só quando você sai."
-    : "";
   // Passado o alvo, o contador para de mostrar a meta e vira um marcador de
   // quanto a pessoa aguentou — que é o que interessa daí pra frente.
   document.getElementById("hudTab").innerHTML = sessao.completados >= CONFIG.TABULEIROS_ALVO
@@ -1085,16 +1102,18 @@ function atualizarHud() {
   bt.textContent = preso ? "Sem saída — reiniciar" : "Reiniciar";
   bt.classList.toggle("forte", preso);
 
+  // Cascata do recipiente: estoque grátis → moedas → anúncio. Ninguém fica
+  // sem o resgate; o que muda é o preço que ele teve.
   const br = document.getElementById("btRecipiente");
-  const podeR = !jogo.recipienteComprado && !jogo.travado && !sessao.encerrada &&
-    saldo() >= CONFIG.CUSTO_RECIPIENTE;
+  const podeR = !jogo.recipienteComprado && !jogo.travado && !sessao.encerrada;
   br.disabled = !podeR;
   br.textContent = jogo.recipienteComprado
     ? "Recipiente ✓ (1 por tabuleiro)"
-    : saldo() >= CONFIG.CUSTO_RECIPIENTE
-      ? "＋ Recipiente extra — " + CONFIG.CUSTO_RECIPIENTE
-      : "＋ Recipiente (sem saldo)";
-  // travado sem saída, com dinheiro no bolso: o resgate se anuncia
+    : estoqueRecipientes > 0
+      ? "＋ Recipiente (grátis: " + estoqueRecipientes + " no estoque)"
+      : saldo() >= CONFIG.CUSTO_RECIPIENTE
+        ? "＋ Recipiente extra — " + CONFIG.CUSTO_RECIPIENTE
+        : "▶ Recipiente (assistir anúncio)";
   br.classList.toggle("forte", preso && podeR);
 }
 
@@ -1132,19 +1151,48 @@ document.getElementById("btParei").onclick = () => {
   if (!sessao.encerrada) encerrar();
 };
 
-document.getElementById("btMelhoria").onclick = () => {
-  const custo = custoMelhoria();
-  if (sessao.encerrada || saldo() < custo) return;
-  sessao.investido += custo;
-  sessao.nivel++;
-  salvar();
-  atualizarHud();
+// Anúncio SIMULADO: 5 s de espera. No portal o rewarded só existe no Full
+// Launch; aqui a contagem mede a única coisa que dá pra medir antes — se a
+// pessoa topa esperar pra ganhar o item. sessao.anuncios é a métrica de
+// intenção de rewarded.
+let anuncioRodando = false;
+function simularAnuncio(bt, aoTerminar) {
+  if (anuncioRodando) return;
+  anuncioRodando = true;
+  const rotulo = bt.textContent;
+  let resta = 5;
+  bt.disabled = true;
+  bt.textContent = "▶ anúncio… " + resta + "s";
+  const timer = setInterval(() => {
+    resta--;
+    if (resta > 0) { bt.textContent = "▶ anúncio… " + resta + "s"; return; }
+    clearInterval(timer);
+    anuncioRodando = false;
+    sessao.anuncios++;
+    bt.textContent = rotulo;
+    aoTerminar();
+    atualizarHud();
+  }, 1000);
+}
+
+document.getElementById("btDesafio").onclick = () => {
+  if (diaDesafioFeito === diaHoje() || sessao.encerrada || jogo.ehDesafio) return;
+  novoTabuleiro(tabuleiroDoDia(diaHoje()));
 };
 
-document.getElementById("btRecipiente").onclick = () => {
-  if (jogo.recipienteComprado || jogo.travado || sessao.encerrada) return;
-  if (saldo() < CONFIG.CUSTO_RECIPIENTE) return;
-  sessao.gastoRecipientes += CONFIG.CUSTO_RECIPIENTE;
+document.getElementById("btDica").onclick = (e) => {
+  if (jogo.travado || sessao.encerrada || anuncioRodando) return;
+  simularAnuncio(e.currentTarget, () => {
+    const mv = dicaOtima(jogo.tubos);
+    if (!mv) return;
+    jogo.dica = mv;
+    sessao.dicas++;
+    desenhar();
+    setTimeout(() => { if (jogo.dica === mv) { jogo.dica = null; desenhar(); } }, 4000);
+  });
+};
+
+function aplicarRecipiente() {
   jogo.recipienteComprado = true;
   jogo.tubos.push([]);
   // o histórico também ganha o tubo, senão um desfazer removeria a compra
@@ -1153,6 +1201,15 @@ document.getElementById("btRecipiente").onclick = () => {
   desenhar();
   atualizarHud();
   salvar();
+}
+
+document.getElementById("btRecipiente").onclick = (e) => {
+  if (jogo.recipienteComprado || jogo.travado || sessao.encerrada || anuncioRodando) return;
+  if (estoqueRecipientes > 0) { estoqueRecipientes--; aplicarRecipiente(); }
+  else if (saldo() >= CONFIG.CUSTO_RECIPIENTE) {
+    sessao.gastoRecipientes += CONFIG.CUSTO_RECIPIENTE;
+    aplicarRecipiente();
+  } else simularAnuncio(e.currentTarget, aplicarRecipiente);
 };
 
 document.getElementById("btEnjoei").onclick = (e) => {
@@ -1165,76 +1222,8 @@ document.getElementById("btEnjoei").onclick = (e) => {
   e.currentTarget.disabled = true;
 };
 
-/* ─────────────── tela 2: a volta ─────────────── */
-
-let horasFora = 8;
-let dobrado = false;
-
-function acumulo() {
-  const horas = Math.min(horasFora, CONFIG.TETO_OFFLINE_HORAS);
-  const base = sessao.nivel * CONFIG.PRODUCAO_POR_HORA * horas;
-  return Math.round(base) * (dobrado ? 2 : 1);
-}
-
-function pintarVolta() {
-  const real = pendenteColeta > 0;
-  // No retorno real o simulador de ausência some: o número na tela é o que a
-  // ausência de verdade rendeu, não um cenário.
-  document.getElementById("segsAusencia").parentElement.style.display =
-    real ? "none" : "";
-  document.getElementById("voltaTitulo").textContent = real
-    ? "Enquanto você esteve fora — de verdade" : "Enquanto você esteve fora";
-  const valor = real ? pendenteColeta * (dobrado ? 2 : 1) : acumulo();
-  document.getElementById("voltaMoeda").textContent = valor.toLocaleString("pt-BR");
-  const noTeto = horasFora > CONFIG.TETO_OFFLINE_HORAS;
-  // Nível 0 rende zero, de propósito: a passiva só existe depois da primeira
-  // compra, e é assim que ela se ensina sozinha.
-  document.getElementById("voltaLinha").innerHTML = real
-    ? "moedas produzidas na sua ausência, nível " + sessao.nivel +
-      (dobrado ? " — <strong>dobrado</strong>" : "")
-    : sessao.nivel === 0
-      ? "<strong>sem produção</strong> — a passiva só existe depois de comprar o primeiro nível"
-      : noTeto
-        ? "moedas acumuladas — <strong>teto de " + CONFIG.TETO_OFFLINE_HORAS +
-          " h atingido</strong>, as horas a mais não renderam nada"
-        : "moedas acumuladas em " + horasFora + " h no nível " + sessao.nivel +
-          (dobrado ? " — <strong>dobrado</strong>" : "");
-  document.getElementById("btDobrar").disabled = dobrado || sessao.nivel === 0;
-  document.getElementById("btDobrar").textContent = dobrado
-    ? "✓ Dobrado" : "▶ Assistir e levar 2×";
-  document.getElementById("btVoltarJogo").textContent = real
-    ? "Coletar " + valor.toLocaleString("pt-BR") + " e jogar"
-    : "Voltar ao tabuleiro";
-}
-
-document.getElementById("segsAusencia").onclick = (e) => {
-  const b = e.target.closest("button");
-  if (!b) return;
-  horasFora = parseFloat(b.dataset.h);
-  dobrado = false;
-  [...e.currentTarget.children].forEach(x =>
-    x.setAttribute("aria-pressed", String(x === b)));
-  pintarVolta();
-};
-
-document.getElementById("btDobrar").onclick = () => { dobrado = true; pintarVolta(); };
-// no modo real o "dobrar" simula o rewarded de dobra — a coleta aplica o ×2
-document.getElementById("btVoltarJogo").onclick = () => {
-  if (pendenteColeta > 0) {
-    banco += pendenteColeta * (dobrado ? 2 : 1);
-    pendenteColeta = 0;
-    dobrado = false;
-    salvar();
-    atualizarHud();
-  }
-  mostrar(null);
-};
-document.getElementById("btVerVolta").onclick = () => mostrar("telaVolta");
-document.getElementById("btPreverProducao").onclick = () => mostrar("telaVolta");
-
 function mostrar(id) {
   document.querySelectorAll(".tela").forEach(t => t.classList.toggle("on", t.id === id));
-  if (id === "telaVolta") pintarVolta();
 }
 
 /* ─────────────── tela 3: o veredito ─────────────── */
@@ -1275,9 +1264,9 @@ function encerrar() {
   // Bancarrota antes do primeiro tabuleiro: só existia como possibilidade
   // antes da correção acima (sessao.completados === 0 agora nunca cobra), mas
   // fica o diagnóstico pra sessões antigas e como rede de segurança.
-  const quebrouSemVitoria = n === 0 && (sessao.gasto + sessao.investido) > 0;
+  const quebrouSemVitoria = n === 0 && (sessao.gasto + sessao.gastoRecipientes) > 0;
   const quebrou = n >= 1 && !quebrouSemVitoria &&
-    saldo() < CONFIG.CUSTO_DESFAZER * 3 && (sessao.gasto + sessao.investido) > 0;
+    saldo() < CONFIG.CUSTO_DESFAZER * 3 && (sessao.gasto + sessao.gastoRecipientes) > 0;
   // Havendo marcador de tédio, ELE é a sessão. O que veio depois é teimosia ou
   // cortesia, e não conta como engajamento.
   const segReal = sessao.enjoou ? sessao.enjoou.seg : totalSeg;
@@ -1321,9 +1310,9 @@ function encerrar() {
             "para praticamente nada. E não foi tédio nem dificuldade: a precisão ficou em " +
             (eficiencia * 100).toFixed(0) + " % e o pior tabuleiro em " +
             (Math.max(...sessao.tempos) / medianaT).toFixed(1) + "× a mediana. " +
-            "<strong>Foi a economia que consumiu o caixa.</strong> Investir na produção é a " +
-            "decisão certa e este teste não consegue premiá-la — a passiva só paga na " +
-            "ausência, e numa sessão única não existe amanhã.";
+            "<strong>Foi a economia que consumiu o caixa</strong> — resgate custa caro " +
+            "de propósito, mas quebrar de vez não pode ser o resultado; se isto se " +
+            "repetir, o preço do recipiente está alto demais.";
   } else if (parede) {
     classe = "duvida"; titulo = "Bateu numa parede, não cansou";
     texto = "Parou no " + n + "º de " + CONFIG.TABULEIROS_ALVO + ", mas <strong>não foi " +
@@ -1377,8 +1366,9 @@ function encerrar() {
     ["Reinícios", String(sessao.reinicios), cls(sessao.reinicios === 0, sessao.reinicios <= 2)],
     ["Maior sequência", String(sessao.maiorSequencia), cls(sessao.maiorSequencia >= 5, sessao.maiorSequencia >= 2)],
     ["Moedas ganhas", sessao.ganho.toLocaleString("pt-BR"), "atencao"],
-    ["Nível de produção", String(sessao.nivel), cls(sessao.nivel > 0, true)],
-    ...(sessao.investido ? [["Investido em produção", "−" + sessao.investido, "atencao"]] : []),
+    ...(sessao.desafioFeito ? [["Desafio do dia", "feito ✓", "bom"]] : []),
+    ...(sessao.dicas ? [["Dicas usadas", String(sessao.dicas), "atencao"]] : []),
+    ...(sessao.anuncios ? [["Anúncios simulados assistidos", String(sessao.anuncios), "atencao"]] : []),
     ...(sessao.gasto ? (() => {
       const razao = sessao.ganho ? sessao.gasto / sessao.ganho : Infinity;
       return [["Gasto em desfazer", "−" + sessao.gasto.toLocaleString("pt-BR") +
@@ -1407,6 +1397,8 @@ function encerrar() {
     "\nFaixas: " + sessao.faixas.join(", ") +
     "\nScores de dificuldade: " + sessao.scoresDif.join(", ") +
     "\nRecipientes extras: " + sessao.recipientes.join(", ") +
+    "\nDicas/Anúncios/Desafio: " + sessao.dicas + "/" + sessao.anuncios + "/" +
+      (sessao.desafioFeito ? "sim" : "não") +
     "\nLayouts: " + sessao.layouts.join(" ") +
     "\nPar: " + sessao.pares.join(", ");
 
@@ -1437,7 +1429,7 @@ document.getElementById("btDeNovo").onclick = () => {
   Object.assign(sessao, {
     tabuleiro: 1, completados: 0, inicio: 0, tempos: [], movimentos: [],
     despejos: [], nos: [], pares: [], desfazer: 0, reinicios: 0, ganho: 0, gasto: 0,
-    investido: 0, nivel: 0,
+    dicas: 0, anuncios: 0, desafioFeito: false,
     sequencia: 0, maiorSequencia: 0, layouts: [], faixas: [], scoresDif: [],
     recipientes: [], gastoRecipientes: 0,
     enjoou: null, encerrada: false,
@@ -1455,8 +1447,8 @@ document.getElementById("btDeNovo").onclick = () => {
 document.getElementById("btZerar").onclick = () => {
   try { localStorage.removeItem(CHAVE_SAVE); } catch {}
   banco = CONFIG.MOEDA_INICIAL;
-  sessao.nivel = 0;
-  pendenteColeta = 0;
+  estoqueRecipientes = 0;
+  diaDesafioFeito = null;
   document.getElementById("btDeNovo").click();
 };
 
@@ -1473,14 +1465,10 @@ addEventListener("pagehide", salvar);
 const save = carregarSave();
 if (save && typeof save.banco === "number") {
   banco = save.banco;
-  sessao.nivel = save.nivel || 0;
-  const fora = Date.now() - (save.quando || Date.now());
-  // Só mostra a volta se a ausência foi real (≥ 1 min) e rendeu algo —
-  // recarregar a página no meio do jogo não é "voltar".
-  if (fora >= 60000) pendenteColeta = producaoAcumulada(sessao.nivel, fora);
+  estoqueRecipientes = save.estoque || 0;
+  diaDesafioFeito = save.diaDesafio || null;
 }
 novoTabuleiro();
-if (pendenteColeta > 0) { dobrado = false; mostrar("telaVolta"); }
 </script>
 
 </body>
