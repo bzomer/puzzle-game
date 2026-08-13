@@ -290,7 +290,10 @@
   <div class="palco"><canvas id="tela"></canvas></div>
 
   <div class="loja">
-    <button id="btMelhoria">Produção</button>
+    <div style="display:flex; gap:8px">
+      <button id="btMelhoria">Produção</button>
+      <button id="btRecipiente">Recipiente</button>
+    </div>
     <!-- Comprar mudava só o texto do botão — nenhum sinal de que a compra fez
          algo. Uma sessão gastou 104 (nível 2) sem nenhum retorno visível
          durante o jogo, porque o único lugar que mostra produção é a tela de
@@ -433,6 +436,14 @@ const CONFIG = {
   // (GameAnalytics), e o que matou uma sessão real aqui (parede de 4,4× a
   // mediana). O diretor nunca serve um destes.
   TETO_PAREDE: 1.7,
+  // O experimento discriminante da moeda (2 playtests: 0/2 compraram
+  // produção, 743 moedas paradas, e a designer: "não estou vendo sentido nas
+  // moedas"). Diagnóstico: a moeda só comprava mais moeda — sem valor
+  // terminal. Isto é a primeira compra que TOCA O PUZZLE: um tubo vazio a
+  // mais, no meio do tabuleiro, na hora do aperto. Se nem isto for comprado,
+  // corta-se a meta com confiança (caminho Water Sort: rewarded de utilidade
+  // sem economia).
+  CUSTO_RECIPIENTE: 25,
 };
 
 // As únicas cores da tela. Espalhadas em matiz e em valor, pra
@@ -449,6 +460,7 @@ const jogo = {
   par: 0,
   movimentos: 0,
   desfazerNoTabuleiro: 0,
+  recipienteComprado: false,
   // Despejos NUNCA decrementa. `movimentos` mede o tamanho da solução final;
   // este mede o esforço. Com 51 desfazer numa sessão, os dois divergiram 12
   // pontos percentuais — e sem separá-los a métrica muda de significado
@@ -481,6 +493,8 @@ const sessao = {
   layouts: [],
   faixas: [],
   scoresDif: [],
+  recipientes: [],
+  gastoRecipientes: 0,
   // Momento em que a pessoa DECLARA tédio, separado do momento em que para.
   // Existe porque um testador que já ouviu "o outro fez 17" persegue o 17: a
   // contagem final vira obediência, e só este marcador ainda mede tédio.
@@ -663,6 +677,14 @@ function premioDoTabuleiro(par, movimentos, sequencia) {
   const mult = Math.min(CONFIG.SEQUENCIA_MAX,
     1 + CONFIG.SEQUENCIA_BONUS * (sequencia || 0));
   return Math.round(base * mult);
+}
+
+// Tabuleiro resolvido com recipiente extra paga só a base: sem isso,
+// comprar facilidade AUMENTARIA o bônus de folga (o jogador bateria o par de
+// 8 tubos jogando com 9) — pagar pra ganhar mais seria exploit, não resgate.
+function premioFinal(par, movimentos, sequencia, usouRecipiente) {
+  if (usouRecipiente) return CONFIG.MOEDA_BASE;
+  return premioDoTabuleiro(par, movimentos, sequencia);
 }
 
 function custoDesfazerPuro(completados, desfazerNoTabuleiro) {
@@ -918,6 +940,7 @@ function novoTabuleiro() {
   jogo.movimentos = 0;
   jogo.despejos = 0;
   jogo.desfazerNoTabuleiro = 0;
+  jogo.recipienteComprado = false;
   jogo.selecionado = -1;
   jogo.historico = [];
   jogo.travado = false;
@@ -940,13 +963,18 @@ function concluir() {
   sessao.layouts.push(jogo.layoutInicial || "");
   sessao.faixas.push(jogo.faixa || "?");
   sessao.scoresDif.push(jogo.scoreDif >= 0 ? jogo.scoreDif.toFixed(2) : "?");
+  sessao.recipientes.push(jogo.recipienteComprado ? 1 : 0);
 
   // O prêmio é proporcional à proximidade do par (não a movimentos
   // absolutos) e multiplicado pela sequência acumulada ANTES deste
   // tabuleiro — cada tabuleiro seguido no ritmo aumenta o próximo em 10%,
   // teto ×2. Fórmula pura em premioDoTabuleiro(), coberta pelo harness.
-  sessao.ganho += premioDoTabuleiro(jogo.par, jogo.movimentos, sessao.sequencia);
-  if (dentroDaTolerancia(jogo.par, jogo.movimentos)) {
+  sessao.ganho += premioFinal(jogo.par, jogo.movimentos, sessao.sequencia,
+    jogo.recipienteComprado);
+  if (jogo.recipienteComprado) {
+    // resgate congela a sequência: não estende (o tabuleiro foi facilitado),
+    // não quebra (foi resolvido) — é o que o torna melhor que reiniciar
+  } else if (dentroDaTolerancia(jogo.par, jogo.movimentos)) {
     sessao.sequencia++;
     sessao.maiorSequencia = Math.max(sessao.maiorSequencia, sessao.sequencia);
   } else {
@@ -967,7 +995,8 @@ function concluir() {
 let banco = CONFIG.MOEDA_INICIAL;
 let pendenteColeta = 0;
 
-const saldo = () => banco + sessao.ganho - sessao.gasto - sessao.investido;
+const saldo = () => banco + sessao.ganho - sessao.gasto -
+  sessao.investido - sessao.gastoRecipientes;
 
 const CHAVE_SAVE = "sort-idle-v1";
 function salvar() {
@@ -1055,6 +1084,18 @@ function atualizarHud() {
   const bt = document.getElementById("btReiniciar");
   bt.textContent = preso ? "Sem saída — reiniciar" : "Reiniciar";
   bt.classList.toggle("forte", preso);
+
+  const br = document.getElementById("btRecipiente");
+  const podeR = !jogo.recipienteComprado && !jogo.travado && !sessao.encerrada &&
+    saldo() >= CONFIG.CUSTO_RECIPIENTE;
+  br.disabled = !podeR;
+  br.textContent = jogo.recipienteComprado
+    ? "Recipiente ✓ (1 por tabuleiro)"
+    : saldo() >= CONFIG.CUSTO_RECIPIENTE
+      ? "＋ Recipiente extra — " + CONFIG.CUSTO_RECIPIENTE
+      : "＋ Recipiente (sem saldo)";
+  // travado sem saída, com dinheiro no bolso: o resgate se anuncia
+  br.classList.toggle("forte", preso && podeR);
 }
 
 setInterval(() => {
@@ -1098,6 +1139,20 @@ document.getElementById("btMelhoria").onclick = () => {
   sessao.nivel++;
   salvar();
   atualizarHud();
+};
+
+document.getElementById("btRecipiente").onclick = () => {
+  if (jogo.recipienteComprado || jogo.travado || sessao.encerrada) return;
+  if (saldo() < CONFIG.CUSTO_RECIPIENTE) return;
+  sessao.gastoRecipientes += CONFIG.CUSTO_RECIPIENTE;
+  jogo.recipienteComprado = true;
+  jogo.tubos.push([]);
+  // o histórico também ganha o tubo, senão um desfazer removeria a compra
+  jogo.historico = jogo.historico.map(s => [...s, []]);
+  medir();
+  desenhar();
+  atualizarHud();
+  salvar();
 };
 
 document.getElementById("btEnjoei").onclick = (e) => {
@@ -1330,6 +1385,9 @@ function encerrar() {
         (isFinite(razao) ? "  (" + Math.round(100 * razao) + " %)" : "  (sem ganho ainda)"),
         cls(razao <= 0.15, razao <= 0.3)]];
     })() : []),
+    ...(sessao.gastoRecipientes ? [["Recipientes extras",
+      (sessao.gastoRecipientes / CONFIG.CUSTO_RECIPIENTE) + "  (−" +
+      sessao.gastoRecipientes + ")", "atencao"]] : []),
     ["Saldo final", saldo().toLocaleString("pt-BR"), "atencao"],
   ];
   document.getElementById("fimTabela").innerHTML = linhas
@@ -1348,6 +1406,7 @@ function encerrar() {
     "\nNós do solver: " + sessao.nos.join(", ") +
     "\nFaixas: " + sessao.faixas.join(", ") +
     "\nScores de dificuldade: " + sessao.scoresDif.join(", ") +
+    "\nRecipientes extras: " + sessao.recipientes.join(", ") +
     "\nLayouts: " + sessao.layouts.join(" ") +
     "\nPar: " + sessao.pares.join(", ");
 
@@ -1380,6 +1439,7 @@ document.getElementById("btDeNovo").onclick = () => {
     despejos: [], nos: [], pares: [], desfazer: 0, reinicios: 0, ganho: 0, gasto: 0,
     investido: 0, nivel: 0,
     sequencia: 0, maiorSequencia: 0, layouts: [], faixas: [], scoresDif: [],
+    recipientes: [], gastoRecipientes: 0,
     enjoou: null, encerrada: false,
   });
   const be = document.getElementById("btEnjoei");

@@ -11,7 +11,7 @@ Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica t
   ✓ par confirmado descendo o gradiente em 6/6 tabuleiros (deu 6/6)
 
 ## 3. Gerador (200 tabuleiros, 6 cores)
-Tempo: 3070 ms no total (15.3 ms/tabuleiro).
+Tempo: 2895 ms no total (14.5 ms/tabuleiro).
 Par: mín 13, mediana 18, máx 21.
   ✓ nenhum tabuleiro insolúvel ou trivial servido
   ✓ geração média abaixo de 150 ms (não trava navegador)
@@ -78,6 +78,9 @@ Payback (ausências de 8 h até pagar o nível): n1=1.7 · n2=1.3 · n3=1.4 · n
   ✓ solução exata paga IGUAL em qualquer par (a folga é proporcional)
   ✓ acima da tolerância, só a base — bônus nunca negativo
   ✓ serialização compacta dos layouts (deu "01--5555")
+  ✓ tabuleiro com recipiente extra paga só a base, mesmo batendo o par de 8 tubos com folga
+  ✓ sem recipiente, o prêmio segue a fórmula normal
+  ✓ o resgate custa mais que um tabuleiro bom rende — é socorro, não rotina
 
 ## 9. Produção acumulada (a conta que traz a pessoa de volta)
   ✓ teto de 8 h respeitado: 24 h fora no nível 3 rendem o mesmo que 8 h (72)

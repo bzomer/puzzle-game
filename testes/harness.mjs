@@ -24,7 +24,8 @@ const codigo = puro.slice(0, corte) + `
 export { CONFIG, corrida, podeDespejar, despejar, resolvido, emprensado,
   heuristica, chave, calcularPar, distribuir, gerar, premioDoTabuleiro,
   custoDesfazerPuro, dentroDaTolerancia, serializar, jogadaDoBot,
-  medirDificuldade, faixaDoTabuleiro, gerarDirigido, producaoAcumulada };`;
+  medirDificuldade, faixaDoTabuleiro, gerarDirigido, producaoAcumulada,
+  premioFinal };`;
 const G = await import("data:text/javascript," + encodeURIComponent(codigo));
 
 // ── rng com semente (mulberry32): os números do relatório são reprodutíveis
@@ -426,6 +427,13 @@ diga("\n## 8. Regressões dos bugs achados em playtest");
     "acima da tolerância, só a base — bônus nunca negativo");
   const enc = G.serializar([[0, 1], [], [5, 5, 5, 5]]);
   afirma(enc === "01--5555", `serialização compacta dos layouts (deu "${enc}")`);
+  // recipiente extra: resgate paga só a base, sempre — sem exploit de folga
+  afirma(G.premioFinal(18, 12, 8, true) === G.CONFIG.MOEDA_BASE,
+    "tabuleiro com recipiente extra paga só a base, mesmo batendo o par de 8 tubos com folga");
+  afirma(G.premioFinal(18, 18, 8, false) === G.premioDoTabuleiro(18, 18, 8),
+    "sem recipiente, o prêmio segue a fórmula normal");
+  afirma(G.CONFIG.CUSTO_RECIPIENTE > G.premioDoTabuleiro(18, 18, 0),
+    "o resgate custa mais que um tabuleiro bom rende — é socorro, não rotina");
 }
 
 // ═══ 9. persistência: a conta da volta ══════════════════════════════════
