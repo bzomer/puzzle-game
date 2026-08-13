@@ -97,19 +97,22 @@
     gap: 0;
   }
 
-  /* ---- painel de instrumentos ---- */
+  /* ---- painel de instrumentos: chips soltos, não régua de laboratório ---- */
   .hud {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
+    display: flex;
+    gap: 6px;
+    padding: 8px 8px 4px;
   }
   .hud div {
-    padding: 10px 4px 11px;
+    flex: 1;
+    min-width: 0;
+    padding: 7px 2px 8px;
     text-align: center;
-    border-right: 1px solid var(--line);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 2px 0 var(--line);
   }
-  .hud div:last-child { border-right: 0; }
   .rot {
     display: block;
     font-size: 9.5px;
@@ -137,7 +140,13 @@
 
   /* Progresso do tabuleiro: tubos já completos. Os líderes do gênero mostram
      "quanto falta" o tempo todo; aqui é uma linha, não um medidor gritando. */
-  .progresso { height: 4px; background: var(--panel-sunk); border-bottom: 1px solid var(--line); }
+  .progresso {
+    height: 5px;
+    margin: 0 10px 4px;
+    border-radius: 99px;
+    background: var(--panel-sunk);
+    overflow: hidden;
+  }
   .progresso div { height: 100%; width: 0%; background: var(--bom); transition: width 260ms ease; }
 
   /* ---- tabuleiro ---- */
@@ -223,14 +232,13 @@
     100% { opacity: 0; transform: translateY(-28px); }
   }
 
-  /* ---- ações ---- */
+  /* ---- ações: fileiras soltas sobre o fundo, sem régua de painel ---- */
   .acoes {
     display: flex;
     gap: 8px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-    background: var(--panel);
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
   }
+  /* Botão de jogo mobile: gordinho, com relevo, afunda quando aperta. */
   button {
     font-family: var(--sans);
     font-size: 13px;
@@ -238,22 +246,35 @@
     color: var(--ink);
     background: var(--panel);
     border: 1px solid var(--line-strong);
-    border-radius: 11px;
+    border-radius: 14px;
     padding: 11px 14px;
     cursor: pointer;
     flex: 1;
-    transition: background 120ms ease, transform 80ms ease;
+    box-shadow: 0 3px 0 var(--line-strong);
+    transition: background 120ms ease, transform 80ms ease, box-shadow 80ms ease;
   }
   button:hover:not(:disabled) { background: var(--panel-sunk); }
-  button:active:not(:disabled) { transform: scale(0.97); }
-  button:disabled { color: var(--ink-faint); border-color: var(--line); cursor: default; }
+  button:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 var(--line-strong);
+  }
+  button:disabled {
+    color: var(--ink-faint);
+    border-color: var(--line);
+    box-shadow: 0 3px 0 var(--line);
+    cursor: default;
+  }
   button:focus-visible { outline: 2px solid var(--selecao); outline-offset: 2px; }
   button.forte {
     background: var(--realce);
     color: var(--sobre-realce);
-    border-color: var(--realce);
+    border-color: transparent;
+    box-shadow: 0 3px 0 color-mix(in srgb, var(--realce) 65%, #000);
   }
-  button.forte:hover:not(:disabled) { opacity: 0.88; background: var(--realce); }
+  button.forte:hover:not(:disabled) { opacity: 0.9; background: var(--realce); }
+  button.forte:active:not(:disabled) {
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--realce) 65%, #000);
+  }
 
   /* ---- telas sobrepostas ---- */
   .tela {
@@ -351,13 +372,13 @@
     border-radius: 2px;
   }
 
-  .loja { padding: 8px 12px 0; background: var(--panel); }
+  .loja { padding: 8px 12px 0; }
   .loja button { width: 100%; font-size: 12.5px; padding: 9px; }
   /* o toggle de som é ícone: largura de conteúdo, sem esticar nem encolher */
   .loja #btSom { width: auto; flex: 0 0 auto; padding: 9px 11px; }
 
   /* Instrumento de pesquisa, não controle de jogo — por isso destoa. */
-  .marcador { padding: 0 12px 2px; background: var(--panel); }
+  .marcador { padding: 4px 12px 0; }
   .marcador button {
     width: 100%;
     font-size: 11.5px;
@@ -365,8 +386,10 @@
     color: var(--ink-dim);
     border-style: dashed;
     border-color: var(--line);
+    box-shadow: none;
   }
-  .marcador button:disabled { color: var(--bom); border-color: var(--bom); }
+  .marcador button:active:not(:disabled) { transform: none; }
+  .marcador button:disabled { color: var(--bom); border-color: var(--bom); box-shadow: none; }
 
   .brecha { height: 4px; }
 
@@ -485,11 +508,11 @@
 <div class="app">
   <div class="hud">
     <div><span class="rot">Fase</span><span class="val" id="hudTab">1</span></div>
-    <div><span class="rot">Movimentos</span><span class="val" id="hudMov">0</span></div>
+    <div><span class="rot">Mov</span><span class="val" id="hudMov">0</span></div>
     <div><span class="rot">Par</span><span class="val" id="hudPar">—</span></div>
     <div><span class="rot">Tempo</span><span class="val" id="hudTempo">0:00</span></div>
     <div><span class="rot">Moedas</span><span class="val" id="hudMoeda">0</span></div>
-    <div><span class="rot">Sequência</span><span class="val" id="hudSeq">—</span></div>
+    <div><span class="rot">Seq</span><span class="val" id="hudSeq">—</span></div>
   </div>
 
   <div class="progresso" aria-hidden="true"><div id="barraTubos"></div></div>
@@ -499,21 +522,8 @@
          cruzando, estrelas, colinas e o gato — tudo forma simples de SVG,
          cores presas aos tokens pra aguentar os dois temas. -->
     <svg class="cenario" viewBox="0 0 390 520" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <defs>
-        <radialGradient id="luaGlow">
-          <stop offset="0%" stop-color="#f2e7bd" stop-opacity="0.45"/>
-          <stop offset="100%" stop-color="#f2e7bd" stop-opacity="0"/>
-        </radialGradient>
-      </defs>
-      <defs>
-        <!-- lua crescente por máscara: geometria garantida, sem desenho à mão -->
-        <mask id="mCrescente">
-          <rect width="390" height="520" fill="#fff"/>
-          <circle cx="328" cy="74" r="27" fill="#000"/>
-        </mask>
-      </defs>
-      <circle cx="316" cy="86" r="72" fill="url(#luaGlow)"/>
-      <circle cx="316" cy="86" r="32" fill="#f2e7bd" opacity="0.92" mask="url(#mCrescente)"/>
+      <!-- Sem lua aqui (veto de playtest — competia com o tabuleiro):
+           só estrelas, colinas e o gato. A crescente vive na capa. -->
       <g fill="var(--ink-faint)" opacity="0.7">
         <circle cx="42" cy="58" r="1.6"/>
         <circle cx="92" cy="132" r="1.2"/>
