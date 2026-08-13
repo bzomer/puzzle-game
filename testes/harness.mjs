@@ -12,7 +12,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-const HTML = join(AQUI, "..", "prototipo.html");
+const HTML = join(AQUI, "..", "index.html");
 
 // ── carga da lógica pura ────────────────────────────────────────────────
 const html = readFileSync(HTML, "utf-8");
