@@ -113,6 +113,23 @@ O que entrou, seguindo o consenso:
   tubo** no canvas (boca reta, fundo arredondado, líquido recortado pela
   forma do vidro — no Godot vira `StyleBoxFlat` com `corner_radius`).
 
+## Rodada 4: tema "casa da bruxa" e o caminho de fases
+
+Direção de arte escolhida pela designer: poção / casa da bruxa / mago de
+RPG. E um **override consciente da pesquisa da rodada 3**: o caminho de
+fases entrou mesmo não sendo costume do gênero sort — o motivo declarado é
+a sensação de progresso AO VOLTAR, que é exatamente o que os mapas de
+match-3 entregam. Registrado como aposta da casa, não como consenso.
+
+- **Tema**: pergaminho/madeira de dia, roxo profundo à luz de vela de
+  noite; serifa de grimório nos títulos; roxo místico como cor de marca.
+- **Frascos de poção** no canvas: rolha pousada na boca, fundo bem
+  arredondado, lasca de brilho no vidro — ainda retângulos e cantos.
+- **Caminho de fases**: trilha zigue-zague de baixo pra cima, feitas ✓,
+  atual pulsando, futuras à espreita, sempre 8 nós à frente do jogador.
+  Fluxo: tela inicial → caminho → fase (o relógio da sessão só liga na
+  fase). Nome provisório: **Poções da Bruxa**.
+
 ## O que fica pro porte (Godot)
 
 Anotado aqui pra não virar scope creep no protótipo:
