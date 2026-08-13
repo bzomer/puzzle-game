@@ -180,6 +180,13 @@
                 -22vw 6vh 0 -1px var(--ink-faint);
   }
   @keyframes cintila { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.55; } }
+  .cenario {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
   canvas { display: block; touch-action: manipulation; position: relative; }
 
   /* Números que sobem do tabuleiro: prêmio ganho, custo pago. O valor tem
@@ -381,6 +388,31 @@
     letter-spacing: -0.02em;
     line-height: 1.08;
   }
+  /* A capa é NOITE nos dois temas — como o card do jogo de referência:
+     compromisso deliberado com um visual só, cores explícitas. */
+  #telaInicio {
+    background:
+      radial-gradient(circle at 76% 16%, rgba(242, 231, 189, 0.16), transparent 32%),
+      linear-gradient(#191129, #241839 55%, #2e2050);
+  }
+  #telaInicio .titulo {
+    color: #f4edda;
+    text-shadow: 0 0 24px rgba(169, 133, 230, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+  #telaInicio .lema { color: #b9abd6; }
+  #telaInicio .nota { color: #8d7fae; }
+  #telaInicio .ficha {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #b9abd6;
+  }
+  #telaInicio .ficha b { color: #ffffff; }
+  .lua-marca {
+    display: block;
+    width: 128px;
+    margin: 0 auto 8px;
+    filter: drop-shadow(0 0 20px rgba(242, 231, 189, 0.45));
+  }
   .lema { font-size: 16px; }
   button.jogar {
     font-size: 17px;
@@ -463,6 +495,45 @@
   <div class="progresso" aria-hidden="true"><div id="barraTubos"></div></div>
 
   <div class="palco">
+    <!-- A cena da referência (Witch's Potion): lua com halo, a bruxa
+         cruzando, estrelas, colinas e o gato — tudo forma simples de SVG,
+         cores presas aos tokens pra aguentar os dois temas. -->
+    <svg class="cenario" viewBox="0 0 390 520" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <radialGradient id="luaGlow">
+          <stop offset="0%" stop-color="#f2e7bd" stop-opacity="0.45"/>
+          <stop offset="100%" stop-color="#f2e7bd" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <circle cx="316" cy="86" r="76" fill="url(#luaGlow)"/>
+      <circle cx="316" cy="86" r="34" fill="#f2e7bd" opacity="0.92" stroke="rgba(0,0,0,0.10)"/>
+      <g fill="var(--ink-faint)" opacity="0.7">
+        <circle cx="42" cy="58" r="1.6"/>
+        <circle cx="92" cy="132" r="1.2"/>
+        <circle cx="198" cy="42" r="1.5"/>
+        <circle cx="352" cy="196" r="1.3"/>
+        <circle cx="28" cy="232" r="1.2"/>
+        <circle cx="250" cy="120" r="1.1"/>
+      </g>
+      <g transform="translate(316 86) rotate(-10)" fill="#241830">
+        <rect x="-26" y="6" width="50" height="3" rx="1.5"/>
+        <path d="M24 3 L40 7.5 L24 12 Z"/>
+        <ellipse cx="-2" cy="-4" rx="9" ry="10"/>
+        <circle cx="7" cy="-16" r="4.6"/>
+        <rect x="0" y="-21.5" width="15" height="2.5" rx="1"/>
+        <path d="M4 -21 L12 -21 L7 -35 Z"/>
+      </g>
+      <path d="M0 470 Q 90 432 200 462 T 390 452 L390 520 L0 520 Z"
+            fill="var(--ink)" opacity="0.08"/>
+      <g transform="translate(32 486)" fill="var(--ink)" opacity="0.5">
+        <ellipse cx="0" cy="0" rx="7" ry="9"/>
+        <circle cx="0" cy="-12" r="5.5"/>
+        <path d="M-5 -15 L-3.4 -20.5 L-1 -16 Z"/>
+        <path d="M5 -15 L3.4 -20.5 L1 -16 Z"/>
+        <path d="M6 6 Q 15 4 13 -6" stroke="var(--ink)" stroke-width="2.5"
+              fill="none" stroke-linecap="round"/>
+      </g>
+    </svg>
     <canvas id="tela"></canvas>
     <div class="flutuantes" id="flutuantes" aria-hidden="true"></div>
   </div>
@@ -505,9 +576,20 @@
 <div class="tela on" id="telaInicio">
   <div class="folha inicio">
     <div>
-      <div class="paleta" id="paletaMarca" aria-hidden="true"></div>
+      <svg class="lua-marca" viewBox="0 0 120 78" aria-hidden="true">
+        <circle cx="60" cy="38" r="27" fill="#f2e7bd"/>
+        <g transform="translate(60 38) rotate(-10)" fill="#241830">
+          <rect x="-26" y="6" width="50" height="3" rx="1.5"/>
+          <path d="M24 3 L40 7.5 L24 12 Z"/>
+          <ellipse cx="-2" cy="-4" rx="9" ry="10"/>
+          <circle cx="7" cy="-16" r="4.6"/>
+          <rect x="0" y="-21.5" width="15" height="2.5" rx="1"/>
+          <path d="M4 -21 L12 -21 L7 -35 Z"/>
+        </g>
+      </svg>
       <h2 class="titulo">Poções da Bruxa</h2>
       <p class="lema">Separe as poções. Complete os frascos.</p>
+      <div class="paleta" id="paletaMarca" aria-hidden="true" style="margin-top:14px"></div>
     </div>
     <button class="forte jogar" id="btJogar">▶ Jogar — fase <span id="iniFase">1</span></button>
     <div class="fichas">
@@ -1149,81 +1231,82 @@ function desenhar() {
   const selec = corDe("--selecao");
   const agora = performance.now();
 
-  // Frasco de poção de verdade: gargalo estreito com rolha enfiada, ombros,
-  // corpo de fundo bem arredondado, sombra no chão e brilho no vidro. A
-  // ÁREA DO LÍQUIDO continua o retângulo de sempre (nenhuma conta de layout
-  // mudou) — o gargalo é decoração acima dela. No Godot, a silhueta vira um
-  // Polygon2D/sprite e o líquido continua draw_rect: porte mecânico.
-  const raio = Math.min(14, L.larguraTubo / 2.6);
-  const rolha = corDe("--rolha");
-  const GARGALO = 9;   // altura do gargalo acima da área de líquido
-  const tracarFrasco = (x, y) => {
-    const w = L.larguraTubo, h = L.alturaTubo;
-    const gw = w * 0.56, gx = x + (w - gw) / 2;
+  // Tubo de poção à la Witch's Potion (referência da designer): proveta
+  // AFUNILADA, sem rolha, boca com lábio flarado, vidro claro e lustroso.
+  // O líquido vira trapézios que seguem o afunilamento — ainda formas
+  // simples (no Godot: Polygon2D + draw_colored_polygon, porte mecânico).
+  const raio = Math.min(12, L.larguraTubo / 3);
+  const AFUNILA = 0.16;   // o fundo tem 84% da largura da boca
+  const meiaFolga = (f) => L.larguraTubo * AFUNILA * 0.5 * f;   // f: 0 topo, 1 fundo
+  const tracarTubo = (x, y) => {
+    const w = L.larguraTubo, h = L.alturaTubo, ins = meiaFolga(1), rb = raio;
     ctx.beginPath();
-    ctx.moveTo(gx, y - GARGALO);
-    ctx.lineTo(gx, y - 2);
-    ctx.lineTo(x, y + 2);                              // ombro esquerdo
-    ctx.lineTo(x, y + h - raio);
-    ctx.arcTo(x, y + h, x + raio, y + h, raio);        // fundo
-    ctx.lineTo(x + w - raio, y + h);
-    ctx.arcTo(x + w, y + h, x + w, y + h - raio, raio);
-    ctx.lineTo(x + w, y + 2);
-    ctx.lineTo(gx + gw, y - 2);                        // ombro direito
-    ctx.lineTo(gx + gw, y - GARGALO);
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + ins, y + h - rb);
+    ctx.quadraticCurveTo(x + ins, y + h, x + ins + rb, y + h);
+    ctx.lineTo(x + w - ins - rb, y + h);
+    ctx.quadraticCurveTo(x + w - ins, y + h, x + w - ins, y + h - rb);
+    ctx.lineTo(x + w, y);
     ctx.closePath();
   };
 
   jogo.tubos.forEach((tubo, i) => {
     const pos = posTubo(i);
     const sel = jogo.selecionado === i;
-    // Frasco selecionado se ergue inteiro — o gesto dos líderes do gênero
+    // Tubo selecionado se ergue inteiro — o gesto dos líderes do gênero
     // pra dizer "este está na mão".
     const x = pos.x, y = pos.y - (sel ? 5 : 0);
     const w = L.larguraTubo, h = L.alturaTubo;
+    const xe = (yy) => x + meiaFolga((yy - y) / h);        // parede esquerda
+    const xd = (yy) => x + w - meiaFolga((yy - y) / h);    // parede direita
 
-    // sombra no chão: pousa o frasco na prateleira
-    ctx.fillStyle = "rgba(0, 0, 0, 0.10)";
+    // sombra no chão: pousa o tubo na cena
+    ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
     ctx.beginPath();
-    ctx.ellipse(x + w / 2, pos.y + h + 3, w * 0.42, 3.2, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // a rolha, enfiada no gargalo
-    const rw = w * 0.36;
-    ctx.fillStyle = rolha;
-    ctx.beginPath();
-    ctx.roundRect(x + (w - rw) / 2, y - GARGALO - 6, rw, 9, 2.5);
+    ctx.ellipse(x + w / 2, pos.y + h + 3, w * 0.36, 3, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // o vidro
-    tracarFrasco(x, y);
+    tracarTubo(x, y);
     ctx.fillStyle = vidro;
     ctx.fill();
 
-    // o líquido, de baixo pra cima, recortado pela silhueta do vidro
+    // o líquido: trapézios que acompanham a parede, recortados pelo vidro
     ctx.save();
-    tracarFrasco(x, y);
+    tracarTubo(x, y);
     ctx.clip();
     tubo.forEach((cor, nivel) => {
       if (camadaEmVoo(i, nivel)) return;
       const erguida = sel && nivel >= tubo.length - corrida(tubo);
       const cy = y + h - (nivel + 1) * L.alturaCamada - (erguida ? 5 : 0);
+      const cb = cy + L.alturaCamada + (nivel === 0 ? raio : 0);
       ctx.save();
       ctx.translate(0, cy + 1);
       ctx.fillStyle = gradienteDe(cor);
-      ctx.fillRect(x + 2, 0, w - 4, L.alturaCamada - 2 +
-        (nivel === 0 ? raio : 0));   // a camada do fundo preenche a curva
+      ctx.beginPath();
+      ctx.moveTo(xe(cy) + 1.5, 0);
+      ctx.lineTo(xd(cy) - 1.5, 0);
+      ctx.lineTo(xd(cb) - 1.5, cb - cy - 2);
+      ctx.lineTo(xe(cb) + 1.5, cb - cy - 2);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
       // a superfície da poção reluz
       if (nivel === tubo.length - 1) {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.30)";
-        ctx.fillRect(x + 2, cy + 1, w - 4, 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.32)";
+        ctx.fillRect(xe(cy) + 2, cy + 1, xd(cy) - xe(cy) - 4, 2);
       }
     });
 
-    // brilho de vidro: uma lasca de luz na parede esquerda
-    ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
-    ctx.fillRect(x + 3, y + 4, 3, h - 10);
+    // lustro do vidro: lasca de luz que acompanha a parede esquerda
+    ctx.fillStyle = "rgba(255, 255, 255, 0.20)";
+    ctx.beginPath();
+    ctx.moveTo(x + 4, y + 7);
+    ctx.lineTo(x + 7.5, y + 7);
+    ctx.lineTo(xe(y + h - 16) + 7.5, y + h - 16);
+    ctx.lineTo(xe(y + h - 16) + 4, y + h - 16);
+    ctx.closePath();
+    ctx.fill();
 
     // flash de completo: véu de luz branca dentro do vidro.
     // o t0 pode estar no futuro: espera o bloco em voo assentar.
@@ -1233,20 +1316,38 @@ function desenhar() {
       const resta = 1 - (agora - flash.t0) / FLASH_MS;
       ctx.globalAlpha = 0.4 * resta;
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(x, y - GARGALO, w, h + GARGALO);
+      ctx.fillRect(x, y, w, h);
       ctx.globalAlpha = 1;
     }
     ctx.restore();
 
-    // a borda (flash de completo > dica > seleção > repouso). No flash, a
-    // borda estende A COR do frasco concluído — não um verde de sistema
-    // igual pra todos (veto de playtest).
+    // o vidro reluz por fora: contorno branco + linha do tema por cima
+    // (no pergaminho o branco some e a linha segura; na noite o branco brilha)
+    tracarTubo(x, y);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // a borda de estado (flash > dica > seleção > repouso). No flash, a
+    // borda estende A COR do tubo concluído (veto de playtest ao verde único).
     const emDica = jogo.dica && (jogo.dica[0] === i || jogo.dica[1] === i);
     ctx.strokeStyle = emFlash ? TINTAS[flash.cor]
                     : emDica ? corDe("--atencao")
                     : sel ? selec : linha;
     ctx.lineWidth = emFlash ? 3 : emDica ? 3 : sel ? 2 : 1.25;
-    tracarFrasco(x, y);
+    tracarTubo(x, y);
+    ctx.stroke();
+
+    // o lábio da boca: elipse flarada, a assinatura da proveta
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, y, w * 0.54, 3.4, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, y, w * 0.54, 3.4, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = linha;
+    ctx.lineWidth = 1;
     ctx.stroke();
   });
 
