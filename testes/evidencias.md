@@ -11,7 +11,7 @@ Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica t
   ✓ par confirmado descendo o gradiente em 6/6 tabuleiros (deu 6/6)
 
 ## 3. Gerador (200 tabuleiros, 6 cores)
-Tempo: 3823 ms no total (19.1 ms/tabuleiro).
+Tempo: 2708 ms no total (13.5 ms/tabuleiro).
 Par: mín 13, mediana 18, máx 21.
   ✓ nenhum tabuleiro insolúvel ou trivial servido
   ✓ geração média abaixo de 150 ms (não trava navegador)
@@ -24,14 +24,22 @@ Correlações no mesmo conjunto: score×par ρ=0.32, score×nós ρ=0.16 — o b
   ✓ o score discrimina (não é constante)
 
 ## 5. Dados humanos (5 sessões, 66 tabuleiros): o que prevê o tempo
-tempo×par: ρ=0.56 (n=61)
-tempo×nós do A*: ρ=0.47 (n=13)
-tempo×(movimentos/par): ρ=-0.34 (n=61)
+tempo×par: ρ=0.57 (n=69)
+tempo×nós do A*: ρ=0.40 (n=21)
+tempo×(movimentos/par): ρ=-0.32 (n=69)
 
 **Correção que este harness impôs:** a conclusão anterior do projeto ("o par não prevê a dificuldade sentida") estava errada no agregado — com 61 tabuleiros, o par carrega sinal claro (ρ≈0,56). Ela parecia verdadeira dentro de cada sessão porque o gerador servia par quase constante (14–21, moda 19): sem variação, nenhuma correlação aparece. O que CONTINUA verdade, e importa mais: as catástrofes escapam do par.
 Os 2 piores tempos (182s e 139s) tinham par 19 e 17 — ambos ≤ Q75 dos pares (19). O papel do bot no diretor é este: detectar a armadilha de busca que o par não vê (Kristensen et al. 2024: simulado + humano > qualquer um sozinho). Validação direta bot×humano vem das próximas sessões: o resumo copiável agora carrega os layouts exatos servidos.
   ✓ par carrega sinal no agregado (ρ>0,3) — corrigindo a conclusão anterior do projeto
   ✓ as 2 piores lutas humanas tinham par comum (≤Q75) — a cauda é invisível ao par; daí o bot
+
+## 5b. Validação direta — sessão 8, os 9 tabuleiros exatos
+  ✓ cadeia serializar→desserializar→solver íntegra: par bate em 9/9
+  ✓ economia com streak reproduz a sessão real à moeda: 175 = 175
+  ✓ sequência reproduzida: 9 = 9
+Correlações com o tempo humano nos tabuleiros exatos (n=9): score-bot(50 rod.) ρ=-0.03, par ρ=0.02, nós ρ=-0.22, ORDEM ρ=0.68.
+Leitura honesta: dentro da faixa segura que o diretor serve, nenhuma métrica de dificuldade previu o tempo desta jogadora — o que previu foi a ordem (fadiga/atenção ao longo da sessão). O valor demonstrado do diretor está na CAUDA: pior tabuleiro a 1,4× a mediana, contra 4,4× e 4,0× nas sessões pré-diretor. n=1 sessão; acumula nas próximas.
+  ✓ sem parede na primeira sessão pós-diretor (pior 1.4× a mediana, era 4,4× antes)
 
 ## 6. Diretor: 3 sessões simuladas de 12 tabuleiros
 leve: 15 servidos, score médio 0.18
