@@ -53,12 +53,28 @@ Tudo cosmético: o estado do jogo **nunca espera** animação, e o toque nunca
 Tudo respeita `prefers-reduced-motion`: com motion reduzido, animações de
 canvas não rodam e os avisos aparecem parados.
 
+## Rodada 2: som
+
+Entrou logo em seguida, sintetizado em Web Audio — **zero asset**, na regra
+da casa. Vocabulário mínimo, um significado por som:
+
+| Som | Desenho |
+| --- | --- |
+| Despejo | "plop" que **sobe de tom conforme o tubo enche** (dá pra ouvir o tubo completando sem olhar — o clássico do gênero) |
+| Tubo completo | acorde de duas notas, sincronizado com o flash (espera o bloco assentar) |
+| Tabuleiro resolvido | arpejo maior curto — o tubo final cede a vez à fanfarra |
+| Desfazer | blip descendente |
+| Recipiente extra | duas notas graves ("algo se instalou") |
+| Seleção | tique quase inaudível |
+
+Botão 🔊/🔇 na fileira da loja; a preferência persiste no save. Se o
+navegador bloquear áudio (autoplay), o jogo segue mudo sem reclamar. No
+porte Godot cada `som*` vira um `AudioStreamPlayer` com sample de verdade.
+
 ## O que fica pro porte (Godot)
 
 Anotado aqui pra não virar scope creep no protótipo:
 
-- **Som** — o feedback mais barato e mais ausente; portal/web pede toque de
-  áudio no despejo e na conclusão.
 - **Partículas** na conclusão do tabuleiro (confete contido, na paleta das
   tintas do tabuleiro — o cromo segue acromático).
 - **Squash & stretch** no líquido ao assentar.
