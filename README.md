@@ -1,67 +1,153 @@
-# Protótipo — puzzle de organização por cor
+# puzzle-game
 
 **Jogar: https://bzomer.github.io/puzzle-game/**
 
-Um arquivo, sem dependência, sem build, sem asset. Também dá pra baixar
-`index.html` e abrir com dois cliques.
+Um puzzle de organização por cor com uma meta-camada por cima. Um arquivo
+(`index.html`), sem dependência, sem build. Também dá pra baixar e abrir com
+dois cliques.
 
-## Isto não é um jogo
+## O núcleo
 
-É um instrumento, feito para responder uma pergunta só:
+Recipientes com camadas de cor embaralhadas. Toque num, toque no outro: a
+camada de cima se move se a cor bater. Acaba quando cada recipiente tem uma
+cor só.
 
-> O tabuleiro prende por **dez tabuleiros seguidos**?
-
-Por isso ele não tem economia, progressão, som nem loja. Qualquer uma dessas
-coisas mascararia a resposta — um núcleo morno parece divertido quando há uma
-barra de progresso enchendo do lado.
-
-## Como jogar
-
-Toque num recipiente para pegar a camada de cima, toque em outro para
-despejar. Só entra em cima de espaço vazio ou da mesma cor. Acaba quando cada
-recipiente tiver uma cor só.
-
-Se quiser levar a sério como teste: jogue os dez de uma sentada e, **se cansar
-antes, aperte "Parei aqui"**. A resposta honesta é o dado que interessa; forçar
-os dez por disciplina destrói a medição. No fim ele calcula o veredito sozinho.
+Nasceu como instrumento pra responder uma pergunta binária — *"o tabuleiro
+prende por dez tabuleiros seguidos, sem meta nenhuma?"* — e a resposta foi
+sim, validada por dez sessões de playtest com dois jogadores reais. A partir
+daí virou protótipo de verdade: o resto deste documento é o que mudou desde
+então, e por quê.
 
 ## O par é o mínimo de verdade
 
-O número de movimentos ao lado do seu não é um chute. Vem de uma busca **A\***
-com heurística admissível: para cada cor, o número de recipientes que a contêm
-menos um — um movimento reduz essa soma em no máximo 1, então ela nunca
+O número de movimentos ao lado do seu não é palpite. Vem de um **A\*** com
+heurística admissível — para cada cor, o número de recipientes que a contêm
+menos um; um movimento reduz essa soma em no máximo 1, então ela nunca
 superestima. Recipientes são intercambiáveis, então o estado é canonizado por
-ordenação antes de entrar na tabela, o que corta o espaço de busca em várias
-ordens de grandeza.
+ordenação antes de entrar na tabela de transposição, o que corta o espaço de
+busca em várias ordens de grandeza. Mediana de geração: ~15 ms.
 
-Uma versão anterior usava IDA\* e **não terminava** nesta profundidade: com o
-par em torno de 18 e transposições demais, sem tabela global a busca explode.
+(Uma versão anterior usava IDA\* e não terminava nessa profundidade — sem
+tabela global de estados, as transposições explodem a busca.)
 
-Medido em 50 amostras com 6 cores, em Node 22:
+## O diretor de dificuldade
 
-| | |
-| --- | --- |
-| Tempo do solver | mediana 16 ms, pior caso 47 ms |
-| Par | mínimo 14, média 17,8, máximo 21 |
-| Distribuições insolúveis | 0 em 50 |
-| Invariantes quebradas em 200 partidas aleatórias | 0 |
-| Par confirmado descendo o gradiente do solver | 8 / 8 |
-| Becos sem saída sob jogo **aleatório** | 9 em 200 (4,5 %) |
+Tabuleiros não são sorteados às cegas. Um **bot guloso** joga cada candidato
+12 vezes e mede taxa de beco + excesso de movimentos; esse score decide a
+faixa (leve / média / pesada) e nenhum tabuleiro acima do teto de parede é
+servido — nunca. As duas primeiras rodadas de cada sessão são sempre leves
+(aquecimento), depois o ciclo é leve → média → média → pesada.
 
-A última linha é a razão de o botão de reiniciar se anunciar sozinho quando não
-resta movimento legal: um humano cai nisso bem menos que o acaso, mas travado
-sem aviso ele acha que é bug.
+Motivo: sessões antigas mostraram dificuldade plana matando o interesse (o
+mesmo par servido 9 vezes em 17 tabuleiros) e uma parede isolada (4,4× a
+mediana) encerrando outra sessão sem aviso. Depois do diretor, o pior
+tabuleiro de uma sessão de 22 caiu pra 1,4× a mediana — e picos de dificuldade
+deixaram de expulsar: viraram desafios vencíveis que a sessão atravessa.
 
-## Sem asset nenhum
+## A economia — o que sobreviveu e o que não
 
-Tudo é `fillRect` num canvas — o vidro, o líquido, a borda. Nenhuma imagem,
-nenhuma fonte externa, nenhuma requisição. São 29 KB no total, e é de propósito:
-o porte para uma engine que desenhe com retângulo fica mecânico.
+**A moeda não compra mais moeda.** A primeira versão tinha uma melhoria de
+produção passiva (moeda rendendo moeda com o tempo); em três sessões de
+playtest, zero compras — o ciclo era fechado em si mesmo e não tinha sentido
+nenhum. Foi **aposentada**.
 
-O cromo da interface é acromático pelo mesmo motivo estético: como o jogo
-inteiro é cor saturada, tudo em volta é cinza para não brigar.
+O que ficou, e por quê:
 
-## Os números
+- **Prêmio proporcional ao par**, não a movimentos absolutos — solução exata
+  paga igual em qualquer tabuleiro, seja ele fácil ou difícil.
+- **Sequência**: tabuleiros seguidos dentro da tolerância multiplicam o
+  próximo prêmio em +10%, teto ×2. Mostrada no HUD como a coisa que se está
+  prestes a perder.
+- **Desfazer é pago** (2 moedas, 2 grátis por tabuleiro) — sem isso dava pra
+  caçar o ótimo por tentativa e erro e sempre maximizar o bônus.
+- **Recipiente extra**: a única compra que muda o *jogo*, não só o placar. Um
+  tubo vazio a mais, no meio do tabuleiro, na hora do aperto — 25 moedas ou
+  de graça se vier do estoque do desafio do dia. É resgate, não rotina: o
+  prêmio daquele tabuleiro cai pra base (senão comprar facilidade aumentaria
+  o bônus de folga) e a sequência **congela** em vez de quebrar. Numa sessão
+  de 16 tabuleiros, 3 foram comprados — todos em momentos de aperto real, com
+  zero desfazer na sessão inteira. É a compra que provou ter sentido.
 
-No topo do `<script>`, em `CONFIG`. O primeiro a girar é `CORES` — se a sessão
-fechar rápido demais, 7 ou 8 alongam o tabuleiro sem tocar em mais nada.
+## Desafio do dia, dica, e anúncio simulado
+
+**Desafio do dia**: um tabuleiro pesado, **determinístico pela data** — o
+mesmo pro mundo inteiro, trocando à meia-noite. Prêmio: moedas + um
+recipiente pro estoque. É o gancho de retorno, no padrão do gênero (Water
+Sort, Ball Sort e afins premiam assim, não com produção passiva).
+
+**Dica**: destaca o próximo movimento que reduz o par em 1 — a jogada ótima
+de verdade, não um palpite. Verificado: seguir só dicas resolve exatamente no
+par, sempre.
+
+Os dois — dica e recipiente extra sem saldo — custam um **anúncio simulado**
+(5 segundos de contagem regressiva no próprio botão). O jogo ainda não tem
+anúncio de verdade; a contagem de quantas vezes alguém topa esperar é a
+métrica de intenção de rewarded que dá pra medir antes de existir um SDK de
+portal integrado.
+
+## Persistência
+
+O jogo salva de verdade (`localStorage`): saldo, estoque de recipientes e o
+dia do último desafio feito — gravado a cada tabuleiro, cada compra, e quando
+a aba se esconde (celular mata aba sem avisar; esse é o único momento
+garantido). Fechar e reabrir no dia seguinte é, literalmente, o teste de
+retenção D1.
+
+## Testes
+
+**`testes/harness.mjs`** — roda sem navegador e sem gente:
+
+```
+npm test
+```
+
+Importa a lógica pura **direto de `index.html`** (fonte única — não existe
+cópia pra divergir) e escreve `testes/evidencias.md`. Roda em CI a cada push
+(`.github/workflows/testes.yml`). Cobre: invariantes sob partidas aleatórias,
+exatidão do solver, estatística do gerador, distribuição do score de
+dificuldade, **dados reais de dez sessões de playtest embutidos** (com os
+layouts exatos, pra validar o bot contra humano sem transitividade),
+comportamento do diretor, simulação de economia, determinismo do desafio do
+dia, otimalidade da dica, e regressão de cada bug que o playtest achou.
+
+**`testes/e2e.mjs`** — o jogo jogado por um navegador de verdade
+(Playwright/Chromium): resolve tabuleiros clicando nos tubos pelo caminho
+ótimo, assiste os anúncios simulados, compra recipiente pelas três vias,
+completa o desafio do dia, recarrega a página pra provar a persistência, e
+confere o layout em tela de celular. Não roda em CI (depende de navegador
+instalado); é a verificação local antes de publicar:
+
+```
+npm i
+npm run e2e
+```
+
+## Testar no celular
+
+Pela internet, sem login: **bzomer.github.io/puzzle-game**. Na rede local,
+sem publicar nada: `servir-na-rede.bat` serve esta pasta pro celular abrir
+pelo Wi-Fi (Windows).
+
+## Os números, todo em um lugar
+
+No topo do `<script>` de `index.html`, em `CONFIG`:
+
+```js
+CORES: 6, CAPACIDADE: 4, VAZIOS: 2, TABULEIROS_ALVO: 10,
+MOEDA_BASE: 3, MOEDA_POR_FOLGA: 50, TOLERANCIA_PAR: 1.3, MOEDA_INICIAL: 10,
+CUSTO_DESFAZER: 2, DESFAZER_GRATIS: 2,
+SEQUENCIA_BONUS: 0.1, SEQUENCIA_MAX: 2,
+CUSTO_RECIPIENTE: 25,
+DESAFIO_BONUS_MOEDAS: 25, DESAFIO_BONUS_RECIPIENTES: 1,
+FAIXAS: { leve, media, pesada }, TETO_PAREDE: 1.7,
+```
+
+## Origem
+
+Nasceu como protótipo de um item da pesquisa e proposta de próximo jogo em
+[bzomer/manual-de-jogos](https://github.com/bzomer/manual-de-jogos) (repo
+privado — o manual de como fazer e publicar jogos web). Este repositório
+existe separado porque o GitHub Pages é público mesmo saindo de um repo
+privado, e porque o projeto cresceu demais pra caber como subpasta: economia,
+diretor de dificuldade, harness de testes e bateria E2E próprios, com CI
+independente.
