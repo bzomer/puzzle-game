@@ -28,6 +28,13 @@ let falhas = 0;
 const ok = (cond, rot) => { console.log((cond ? '  ✓ ' : '  ✗ FALHOU: ') + rot); if (!cond) falhas++; };
 const ev = (fn, ...a) => page.evaluate(fn, ...a);
 
+// A tela inicial recebe em todo load — entrar = tocar em Jogar.
+const entrar = async () => {
+  await page.waitForFunction('typeof jogo !== "undefined"', { timeout: 15000 });
+  await page.click('#btJogar');
+  await page.waitForFunction('jogo.par > 0', { timeout: 15000 });
+};
+
 const clicarTubo = i => ev((i) => {
   const cv = document.getElementById('tela');
   const r = cv.getBoundingClientRect();
@@ -49,7 +56,7 @@ async function resolver() {
 }
 
 await page.goto('http://localhost:8123/');
-await page.waitForFunction('typeof jogo !== "undefined" && jogo.par > 0', { timeout: 15000 });
+await entrar();
 
 console.log('T1 carga');
 ok(erros.length === 0, 'sem erro de página na carga' + (erros.length ? ' → ' + erros[0] : ''));
@@ -112,7 +119,7 @@ ok(await ev(() => sessao.ganho) - ganhoAntesD >= 25 + 3, 'bônus de moedas do de
 console.log('T7 persistência: recarrega a página');
 const saldoFinal = await ev(() => saldo());
 await page.reload();
-await page.waitForFunction('typeof jogo !== "undefined" && jogo.par > 0', { timeout: 15000 });
+await entrar();
 ok(await ev(() => banco) === saldoFinal, 'banco sobreviveu ao reload (' + saldoFinal + ')');
 ok(await ev(() => estoqueRecipientes) >= 1, 'estoque de recipientes sobreviveu');
 ok(await ev(() => document.getElementById('btDesafio').textContent.includes('amanhã')), 'desafio segue marcado como feito hoje');
@@ -135,13 +142,13 @@ ok(await ev(() => saldo()) === 10, 'economia zerada (saldo 10)');
 console.log('T10 celular (390px): layout não estoura');
 await page.setViewportSize({ width: 390, height: 780 });
 await page.reload();
-await page.waitForFunction('typeof jogo !== "undefined" && jogo.par > 0', { timeout: 15000 });
+await entrar();
 ok(await ev(() => document.documentElement.scrollWidth) <= 390, 'sem rolagem horizontal');
 ok(await ev(() => document.getElementById('btDica').offsetHeight) > 0, 'botões da loja visíveis');
 await page.screenshot({ path: 'mobile.png' });
 await page.setViewportSize({ width: 900, height: 800 });
 await page.reload();
-await page.waitForFunction('jogo.par > 0');
+await entrar();
 await page.screenshot({ path: 'desktop.png' });
 
 ok(erros.length === 0, 'nenhum erro de página em toda a bateria' + (erros.length ? ' → ' + erros.join(' | ') : ''));

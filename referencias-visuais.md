@@ -80,6 +80,39 @@ Botão 🔊/🔇 na fileira da loja; a preferência persiste no save. Se o
 navegador bloquear áudio (autoplay), o jogo segue mudo sem reclamar. No
 porte Godot cada `som*` vira um `AudioStreamPlayer` com sample de verdade.
 
+## Rodada 3: estrutura de telas e identidade ("cara de jogo")
+
+Veto de playtest na estética de instrumento: "continua muito cara de teste
+(...) não é uma cara de um jogo legalzinho". Pesquisa antes de mexer — a
+pergunta era se o costume pede tela inicial com mapa de fases:
+
+- [Poki: quality guidelines](https://sdk.poki.com/poki-quality-guidelines) e
+  [requirements](https://sdk.poki.com/new-requirements) — na web o costume é
+  o CONTRÁRIO de menu: mínimo de telas, jogador dentro do jogo em <10 s.
+- Líderes do gênero ([Water Sort](https://play.google.com/store/apps/details?id=water.sort.puzzle.color.sort.games),
+  [SortPuz](https://play.google.com/store/apps/details?id=sortpuz.water.sort.puzzle.game)) —
+  abrem direto na fase atual; a progressão é **número de fase contínuo**
+  ("Level 234"), sem mapa (mapa é meta de match-3). O que É universal:
+  tela de **"level complete"** com o prêmio.
+- [Hypercasual UI/UX guide](https://pixune.com/blog/hypercasual-games-ui-ux-design-guide/) —
+  botões grandes e amigáveis, clareza acima de tudo.
+
+O que entrou, seguindo o consenso:
+
+- **Tela inicial leve**: paleta das 8 tintas como marca, título, UM botão
+  ("Jogar — fase N") e fichas de status (moedas, fases completas, desafio).
+  O relógio da sessão só liga no toque em Jogar — tempo de menu não suja a
+  métrica de sessão.
+- **Fase global persistida**: contagem de tabuleiros completados de todos os
+  tempos, o número que só cresce. O "N/10" do instrumento saiu do HUD; o
+  alvo de 10 por sessão segue vivo em `sessao.completados` e no veredito.
+- **Carta de fase concluída**: pula no centro com o prêmio e some sozinha
+  (1,4 s) — celebração sem clique extra entre fases.
+- **Cromo com cor**: `--realce` (o azul das tintas, promovido a marca) nos
+  botões fortes; cantos arredondados em botões e cartas; **tubos com cara de
+  tubo** no canvas (boca reta, fundo arredondado, líquido recortado pela
+  forma do vidro — no Godot vira `StyleBoxFlat` com `corner_radius`).
+
 ## O que fica pro porte (Godot)
 
 Anotado aqui pra não virar scope creep no protótipo:
