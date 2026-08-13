@@ -300,6 +300,8 @@
 
   .loja { padding: 8px 12px 0; background: var(--panel); }
   .loja button { width: 100%; font-size: 12.5px; padding: 9px; }
+  /* o toggle de som é ícone: largura de conteúdo, sem esticar nem encolher */
+  .loja #btSom { width: auto; flex: 0 0 auto; padding: 9px 11px; }
 
   /* Instrumento de pesquisa, não controle de jogo — por isso destoa. */
   .marcador { padding: 0 12px 2px; background: var(--panel); }
@@ -347,6 +349,7 @@
       <button id="btDesafio">★ Desafio do dia</button>
       <button id="btRecipiente">Recipiente</button>
       <button id="btDica">💡 Dica</button>
+      <button id="btSom" aria-label="Som ligado">🔊</button>
     </div>
   </div>
 
@@ -932,7 +935,7 @@ function agendarQuadros() {
     const t = performance.now();
     for (let i = despejosEmVoo.length - 1; i >= 0; i--)
       if (t - despejosEmVoo[i].t0 > DESPEJO_MS) despejosEmVoo.splice(i, 1);
-    for (const [k, t0] of tubosEmFlash) if (t - t0 > FLASH_MS) tubosEmFlash.delete(k);
+    for (const [k, f] of tubosEmFlash) if (t - f.t0 > FLASH_MS) tubosEmFlash.delete(k);
     desenhar();
     if (despejosEmVoo.length || tubosEmFlash.size) requestAnimationFrame(passo);
     else quadroAgendado = false;
@@ -963,7 +966,6 @@ function desenhar() {
   const vidro = corDe("--vidro");
   const linha = corDe("--vidro-linha");
   const selec = corDe("--selecao");
-  const bom = corDe("--bom");
   const agora = performance.now();
 
   jogo.tubos.forEach((tubo, i) => {
@@ -987,20 +989,23 @@ function desenhar() {
     });
 
     // a borda (flash de completo > dica > seleção > repouso)
-    // o t0 pode estar no futuro: o flash espera o bloco em voo assentar
-    const flashT0 = tubosEmFlash.get(i);
-    const emFlash = flashT0 !== undefined && agora >= flashT0 && agora - flashT0 <= FLASH_MS;
+    // o t0 pode estar no futuro: o flash espera o bloco em voo assentar.
+    // A celebração é NA COR do tubo concluído — borda que estende a própria
+    // cor pra fora do vidro — com um véu de luz branca por cima, que brilha
+    // igual sobre qualquer tinta e em qualquer tema. (Verde igual pra todos
+    // ficava errado: seis tubos, um "verde de sistema" só.)
+    const flash = tubosEmFlash.get(i);
+    const emFlash = flash && agora >= flash.t0 && agora - flash.t0 <= FLASH_MS;
     const emDica = jogo.dica && (jogo.dica[0] === i || jogo.dica[1] === i);
-    ctx.strokeStyle = emFlash ? bom
+    ctx.strokeStyle = emFlash ? TINTAS[flash.cor]
                     : emDica ? corDe("--atencao")
                     : sel ? selec : linha;
     ctx.lineWidth = emFlash ? 3 : emDica ? 3 : sel ? 2 : 1;
     ctx.strokeRect(x + 0.5, y + 0.5, L.larguraTubo - 1, L.alturaTubo - 1);
     if (emFlash) {
-      // véu que esmaece: o "pronto!" sem partícula nenhuma
-      const resta = 1 - (agora - flashT0) / FLASH_MS;
-      ctx.globalAlpha = 0.28 * resta;
-      ctx.fillStyle = bom;
+      const resta = 1 - (agora - flash.t0) / FLASH_MS;
+      ctx.globalAlpha = 0.4 * resta;
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(x, y, L.larguraTubo, L.alturaTubo);
       ctx.globalAlpha = 1;
     }
@@ -1028,6 +1033,83 @@ function tuboEm(px, py) {
   return -1;
 }
 
+/* ─────────────── som (Web Audio, zero asset) ───────────────
+   Tudo sintetizado na hora: osciladores + envelope, nenhum arquivo. É o
+   feedback mais barato que faltava (ver referencias-visuais.md), e a regra
+   é a mesma das animações: cosmético, nunca no caminho do estado. Se o
+   navegador bloquear áudio, o jogo segue mudo sem reclamar. No porte
+   Godot cada som* vira um AudioStreamPlayer com sample de verdade. */
+
+let audioCtx = null;
+let somLigado = true;
+
+// Criado/despertado só dentro de gesto do usuário (política de autoplay).
+function contextoDeAudio() {
+  if (!somLigado) return null;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+    return audioCtx;
+  } catch { return null; }
+}
+
+function nota(freq, { dur = 0.12, tipo = "sine", ganho = 0.07, quando = 0, desliza = 0 } = {}) {
+  const ac = contextoDeAudio();
+  if (!ac) return;
+  try {
+    const t0 = ac.currentTime + quando;
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = tipo;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (desliza) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + desliza), t0 + dur);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(ganho, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+    osc.connect(g).connect(ac.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.03);
+  } catch { /* áudio indisponível: segue mudo */ }
+}
+
+// O vocabulário inteiro do jogo — poucos sons, cada um com um significado só.
+const somSelecao = () => nota(440, { dur: 0.05, ganho: 0.03, tipo: "triangle" });
+// O "plop" sobe de tom conforme o destino enche — o clássico do gênero:
+// dá pra OUVIR o tubo completando sem olhar.
+const TONS_DESPEJO = [262, 330, 392, 494];
+const somDespejo = nivel =>
+  nota(TONS_DESPEJO[Math.min(nivel, TONS_DESPEJO.length) - 1] || 262,
+    { dur: 0.09, ganho: 0.06, tipo: "triangle", desliza: -60 });
+const somCompleto = quando => {
+  nota(660, { quando, dur: 0.11, ganho: 0.07 });
+  nota(990, { quando: quando + 0.09, dur: 0.16, ganho: 0.07 });
+};
+const somVitoria = () =>
+  [523, 659, 784, 1047].forEach((f, i) =>
+    nota(f, { quando: 0.15 + i * 0.09, dur: 0.18, ganho: 0.08 }));
+const somDesfazer = () => nota(330, { dur: 0.12, ganho: 0.05, desliza: -140 });
+const somRecipiente = () => {
+  nota(220, { dur: 0.1, ganho: 0.06, tipo: "triangle" });
+  nota(275, { quando: 0.07, dur: 0.14, ganho: 0.06, tipo: "triangle" });
+};
+
+// Em TOQUE, pointerdown não conta como "ativação do usuário" pra política
+// de autoplay — só pointerup/click/touchend contam. Sem esta linha, o jogo
+// inteiro (que joga no pointerdown) nunca acordava o AudioContext no
+// celular e a sessão ficava muda do começo ao fim. As notas agendadas com
+// o contexto suspenso tocam assim que o pointerup do mesmo gesto resolve.
+addEventListener("pointerup", () => { if (somLigado) contextoDeAudio(); }, { passive: true });
+
+document.getElementById("btSom").onclick = e => {
+  somLigado = !somLigado;
+  e.currentTarget.textContent = somLigado ? "🔊" : "🔇";
+  e.currentTarget.setAttribute("aria-label", somLigado ? "Som ligado" : "Som desligado");
+  // O clique é gesto de verdade: liga o som E o confirma com um blip —
+  // sem isso, "liguei?" só se responde no próximo movimento.
+  if (somLigado) nota(523, { dur: 0.1, ganho: 0.06 });
+  salvar();
+};
+
 /* ─────────────── interação ─────────────── */
 
 function toque(ev) {
@@ -1040,7 +1122,7 @@ function toque(ev) {
   ev.preventDefault();
 
   if (jogo.selecionado === -1) {
-    if (jogo.tubos[i].length) { jogo.selecionado = i; desenhar(); }
+    if (jogo.tubos[i].length) { jogo.selecionado = i; somSelecao(); desenhar(); }
     return;
   }
   if (jogo.selecionado === i) { jogo.selecionado = -1; desenhar(); return; }
@@ -1064,9 +1146,15 @@ function toque(ev) {
         y1: pPara.y + layout.alturaTubo - destino.length * layout.alturaCamada,
         t0: performance.now(),
       });
-      if (tuboCompleto(destino)) tubosEmFlash.set(i, performance.now() + DESPEJO_MS);
+      if (tuboCompleto(destino))
+        tubosEmFlash.set(i, { t0: performance.now() + DESPEJO_MS, cor: destino[0] });
       agendarQuadros();
     }
+    somDespejo(jogo.tubos[i].length);
+    // O acorde do tubo completo espera o bloco assentar, como o flash. No
+    // tabuleiro resolvido ele cede a vez à fanfarra de concluir().
+    if (tuboCompleto(jogo.tubos[i]) && !resolvido(jogo.tubos))
+      somCompleto(DESPEJO_MS / 1000);
     atualizarHud();
     desenhar();
     if (resolvido(jogo.tubos)) concluir();
@@ -1111,6 +1199,7 @@ function novoTabuleiro(especial) {
 
 function concluir() {
   jogo.travado = true;
+  somVitoria();
   const seg = (performance.now() - jogo.inicioTabuleiro) / 1000;
   sessao.completados++;
   sessao.tempos.push(seg);
@@ -1176,7 +1265,7 @@ function salvar() {
   try {
     localStorage.setItem(CHAVE_SAVE, JSON.stringify({
       banco: saldo(), estoque: estoqueRecipientes,
-      diaDesafio: diaDesafioFeito, quando: Date.now(),
+      diaDesafio: diaDesafioFeito, som: somLigado, quando: Date.now(),
     }));
   } catch { /* aba privada: o jogo segue, só não persiste */ }
 }
@@ -1307,6 +1396,7 @@ document.getElementById("btDesfazer").onclick = () => {
   // Cobrança visível no lugar da ação: o preço já está no botão, mas o
   // débito acontecendo é o que faz o custo pesar de verdade na decisão.
   if (custoD > 0) flutuar("−" + custoD + " moedas", "ruim");
+  somDesfazer();
   jogo.desfazerNoTabuleiro++;
   jogo.tubos = jogo.historico.pop();
   jogo.movimentos = Math.max(0, jogo.movimentos - 1);
@@ -1371,6 +1461,7 @@ document.getElementById("btDica").onclick = (e) => {
 
 function aplicarRecipiente() {
   jogo.recipienteComprado = true;
+  somRecipiente();
   jogo.tubos.push([]);
   // o histórico também ganha o tubo, senão um desfazer removeria a compra
   jogo.historico = jogo.historico.map(s => [...s, []]);
@@ -1644,6 +1735,13 @@ if (save && typeof save.banco === "number") {
   banco = save.banco;
   estoqueRecipientes = save.estoque || 0;
   diaDesafioFeito = save.diaDesafio || null;
+  // ausente no save antigo = ligado; só o falso explícito silencia
+  somLigado = save.som !== false;
+  if (!somLigado) {
+    const bs = document.getElementById("btSom");
+    bs.textContent = "🔇";
+    bs.setAttribute("aria-label", "Som desligado");
+  }
 }
 novoTabuleiro();
 </script>
