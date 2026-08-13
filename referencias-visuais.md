@@ -56,16 +56,25 @@ canvas não rodam e os avisos aparecem parados.
 ## Rodada 2: som
 
 Entrou logo em seguida, sintetizado em Web Audio — **zero asset**, na regra
-da casa. Vocabulário mínimo, um significado por som:
+da casa. A primeira versão usava bips crus de oscilador; o playtest vetou
+("não gostei dos sons") e a direção escolhida foi **musical minimalista**:
+teclas de marimba sintetizadas (fundamental + parcial ~4× que morre rápido,
+ataque macio, decaimento longo), tudo na **pentatônica de dó** — qualquer
+sequência soa consonante, nunca "erra". Vocabulário mínimo, um significado
+por som:
+
+Segunda rodada de veto: nota musical em cada movimento cansa — os sons
+FREQUENTES viraram outra família (percussão abafada / silêncio), e as notas
+ficaram só nos momentos de conquista.
 
 | Som | Desenho |
 | --- | --- |
-| Despejo | "plop" que **sobe de tom conforme o tubo enche** (dá pra ouvir o tubo completando sem olhar — o clássico do gênero) |
-| Tubo completo | acorde de duas notas, sincronizado com o flash (espera o bloco assentar) |
-| Tabuleiro resolvido | arpejo maior curto — o tubo final cede a vez à fanfarra |
-| Desfazer | blip descendente |
-| Recipiente extra | duas notas graves ("algo se instalou") |
-| Seleção | tique quase inaudível |
+| Despejo | percussão abafada ("toc" de madeira com feltro), grave e curtíssima, subindo um nadinha conforme o tubo enche — informação, não melodia |
+| Seleção | **mudo** — o tubo erguendo é o feedback |
+| Tubo completo | duas teclas (mi5 → dó6), sincronizadas com o flash (esperam o bloco assentar) |
+| Tabuleiro resolvido | arpejo pentatônico calmo — o tubo final cede a vez |
+| Desfazer | tecla grave curta |
+| Recipiente extra | duas teclas graves ("algo se instalou") |
 
 Botão 🔊/🔇 na fileira da loja; a preferência persiste no save. Se o
 navegador bloquear áudio (autoplay), o jogo segue mudo sem reclamar. No
