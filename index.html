@@ -320,6 +320,21 @@
   }
   .flut.bom { color: var(--bom); border-color: var(--bom); }
   .flut.ruim { color: var(--ruim); }
+  /* O aviso de "sem saída": o badge do botão (10.5px, fonte decorativa) foi
+     confirmado por playtest real como pouco visível no calor do jogo — o
+     jogador achou que o jogo tinha travado sem saber que existia um botão
+     pra isso. Este aviso lê fácil e aparece só na primeira vez. */
+  .flut.aviso {
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 600;
+    max-width: 250px;
+    text-align: center;
+    line-height: 1.4;
+    padding: 10px 16px;
+    border-color: var(--ruim);
+    color: var(--ink);
+  }
   @keyframes flut-sobe {
     0%   { opacity: 0; transform: translateY(12px); }
     15%  { opacity: 1; transform: translateY(6px); }
@@ -1613,6 +1628,7 @@ cv.addEventListener("pointerdown", toque);
 /* ─────────────── ciclo de tabuleiro ─────────────── */
 
 function novoTabuleiro(especial) {
+  presoAntes = false;   // tabuleiro novo: o aviso de "sem saída" pode valer de novo
   const servido = especial || gerarDirigido(sessao.completados);
   jogo.tubos = servido.tubos;
   jogo.par = servido.par;
@@ -1736,15 +1752,20 @@ function custoDesfazerAtual() {
 }
 
 // Número que sobe do tabuleiro. O contador do HUD registra; isto AVISA.
-function flutuar(texto, classe) {
+function flutuar(texto, classe, duracaoMs = 1200) {
   const caixa = document.getElementById("flutuantes");
   const el = document.createElement("span");
   el.className = "flut" + (classe ? " " + classe : "");
   el.textContent = texto;
+  if (duracaoMs !== 1200) el.style.animationDuration = duracaoMs + "ms";
   caixa.appendChild(el);
   el.addEventListener("animationend", () => el.remove());
-  setTimeout(() => el.remove(), 2200);   // rede: reduced-motion não anima
+  setTimeout(() => el.remove(), duracaoMs + 1000);   // rede: reduced-motion não anima
 }
+
+// Rastreia a TRANSIÇÃO pra travado — o aviso dispara uma vez, não a cada
+// clique enquanto o jogador ainda está preso (isso viraria spam).
+let presoAntes = false;
 
 // Troca o texto de um valor do HUD e pulsa SÓ quando ele mudou de verdade —
 // atualizarHud roda a cada toque, e pulsar sem mudança viraria ruído.
@@ -1819,6 +1840,14 @@ function atualizarHud() {
   // O tabuleiro resolvido também não tem movimento legal — sem o teste de
   // resolvido, o botão gritava "Sem saída" nos 450ms antes do próximo.
   const preso = !jogo.travado && !resolvido(jogo.tubos) && emprensado(jogo.tubos);
+  // Achado em playtest real: jogador ficou preso e achou que não havia mais
+  // movimento — o badge sozinho não bastou. O aviso, mais legível, dispara
+  // só na transição falso→verdadeiro.
+  if (preso && !presoAntes) {
+    flutuar("Sem movimentos — toque em ↻ pra reiniciar (ou compre um frasco)",
+      "aviso", 2800);
+  }
+  presoAntes = preso;
   const bt = document.getElementById("btReiniciar");
   const sr = document.getElementById("seloReiniciar");
   sr.hidden = !preso;

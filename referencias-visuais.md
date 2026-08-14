@@ -1,0 +1,208 @@
+# Referências visuais — o que o gênero faz, e o que disso entrou aqui
+
+Levantamento feito antes da rodada de melhorias de HUD/feedback (ago/2026).
+O critério de seleção: só entra o que os líderes do gênero *sort* fazem em
+consenso, ou o que a literatura de game feel sustenta — e só se couber na
+regra da casa: **cromo acromático** (a única cor da tela é o líquido) e
+**canvas só com retângulo** (pra que o porte pro Godot via `draw_rect`
+continue mecânico).
+
+## As referências
+
+**Líderes do gênero (Water Sort / Ball Sort e derivados)**
+
+- [Water Sort: Color Tube Puzzle](https://play.google.com/store/apps/details?id=water.sort.puzzle.color.sort.games) e
+  [SortPuz](https://play.google.com/store/apps/details?id=sortpuz.water.sort.puzzle.game) — o consenso visual do gênero:
+  - o tubo selecionado **se ergue** ("este está na mão");
+  - o despejo é **animado** — o líquido viaja da origem ao destino;
+  - tubo completado ganha **celebração imediata** (brilho/confete/check);
+  - trio de power-ups sempre visível: Undo / Hint / Extra Bottle
+    (já era o nosso trio, validado em playtest);
+  - design "clean e minimalista": o HUD não compete com o tabuleiro.
+- [Guia de estratégia Water Sort](https://funhub1.com/blog/water-sort-puzzle-guide) —
+  confirma o papel do undo/hint na experiência: ferramenta de experimentação,
+  não muleta (a nossa economia do desfazer pago segue mais dura que o gênero,
+  de propósito — é instrumento de medição).
+
+**Game feel / juice**
+
+- [Making a Game Feel "Juicy" with Simple Effects](https://resprawn.medium.com/when-you-play-a-great-game-it-feels-good-d23761b6eccf) —
+  a tríade: resposta instantânea ao input, feedback legível por ação, e a
+  camada de polish (squash & stretch, partículas, som) por cima.
+- [How to Make Your Game Feel Good](https://egmatic.com/blog/how-to-make-your-game-feel-good) —
+  feedback tem que aparecer **onde a ação aconteceu**, não só num contador.
+- [The Juice is Not Worth the Squeeze](https://www.wayline.io/blog/juice-visual-polish-game-development) —
+  o contraponto que valida a nossa ordem: polish **não salva** núcleo fraco.
+  Este projeto validou o núcleo primeiro (10 sessões de playtest) e só agora
+  investe em feel — a ordem certa.
+
+## O que entrou nesta rodada
+
+Tudo cosmético: o estado do jogo **nunca espera** animação, e o toque nunca
+é bloqueado — o E2E clica no ritmo dele e nada muda.
+
+| Melhoria | Referência | Como |
+| --- | --- | --- |
+| Barra de progresso do tabuleiro | gênero: "quanto falta" sempre visível | linha de 4px sob o HUD, tubos completos / cores |
+| Animação de despejo | gênero: o líquido viaja | bloco-retângulo em arco curto, ~170ms, ease-out |
+| Flash no tubo completado | gênero: celebração imediata | borda **na cor concluída** + véu de luz branca esmaecendo em ~650ms (feedback de playtest: verde igual pra todos ficava errado) |
+| Tubo selecionado se ergue | gênero: "está na mão" | tubo inteiro sobe 5px (a corrida do topo já subia) |
+| "+N moedas" / "−N" flutuante | juice: feedback onde a ação aconteceu | texto mono sobre o palco, sobe e some |
+| Pulso nos valores do HUD | juice: aviso periférico de mudança | scale 1.28→1 em 220ms, só quando o valor muda |
+
+Tudo respeita `prefers-reduced-motion`: com motion reduzido, animações de
+canvas não rodam e os avisos aparecem parados.
+
+## Rodada 2: som
+
+Entrou logo em seguida, sintetizado em Web Audio — **zero asset**, na regra
+da casa. A primeira versão usava bips crus de oscilador; o playtest vetou
+("não gostei dos sons") e a direção escolhida foi **musical minimalista**:
+teclas de marimba sintetizadas (fundamental + parcial ~4× que morre rápido,
+ataque macio, decaimento longo), tudo na **pentatônica de dó** — qualquer
+sequência soa consonante, nunca "erra". Vocabulário mínimo, um significado
+por som:
+
+Segunda rodada de veto: nota musical em cada movimento cansa — os sons
+FREQUENTES viraram outra família (percussão abafada / silêncio), e as notas
+ficaram só nos momentos de conquista.
+
+| Som | Desenho |
+| --- | --- |
+| Despejo | percussão abafada ("toc" de madeira com feltro), grave e curtíssima, subindo um nadinha conforme o tubo enche — informação, não melodia |
+| Seleção | **mudo** — o tubo erguendo é o feedback |
+| Tubo completo | duas teclas (mi5 → dó6), sincronizadas com o flash (esperam o bloco assentar) |
+| Tabuleiro resolvido | arpejo pentatônico calmo — o tubo final cede a vez |
+| Desfazer | tecla grave curta |
+| Recipiente extra | duas teclas graves ("algo se instalou") |
+
+Botão 🔊/🔇 na fileira da loja; a preferência persiste no save. Se o
+navegador bloquear áudio (autoplay), o jogo segue mudo sem reclamar. No
+porte Godot cada `som*` vira um `AudioStreamPlayer` com sample de verdade.
+
+## Rodada 3: estrutura de telas e identidade ("cara de jogo")
+
+Veto de playtest na estética de instrumento: "continua muito cara de teste
+(...) não é uma cara de um jogo legalzinho". Pesquisa antes de mexer — a
+pergunta era se o costume pede tela inicial com mapa de fases:
+
+- [Poki: quality guidelines](https://sdk.poki.com/poki-quality-guidelines) e
+  [requirements](https://sdk.poki.com/new-requirements) — na web o costume é
+  o CONTRÁRIO de menu: mínimo de telas, jogador dentro do jogo em <10 s.
+- Líderes do gênero ([Water Sort](https://play.google.com/store/apps/details?id=water.sort.puzzle.color.sort.games),
+  [SortPuz](https://play.google.com/store/apps/details?id=sortpuz.water.sort.puzzle.game)) —
+  abrem direto na fase atual; a progressão é **número de fase contínuo**
+  ("Level 234"), sem mapa (mapa é meta de match-3). O que É universal:
+  tela de **"level complete"** com o prêmio.
+- [Hypercasual UI/UX guide](https://pixune.com/blog/hypercasual-games-ui-ux-design-guide/) —
+  botões grandes e amigáveis, clareza acima de tudo.
+
+O que entrou, seguindo o consenso:
+
+- **Tela inicial leve**: paleta das 8 tintas como marca, título, UM botão
+  ("Jogar — fase N") e fichas de status (moedas, fases completas, desafio).
+  O relógio da sessão só liga no toque em Jogar — tempo de menu não suja a
+  métrica de sessão.
+- **Fase global persistida**: contagem de tabuleiros completados de todos os
+  tempos, o número que só cresce. O "N/10" do instrumento saiu do HUD; o
+  alvo de 10 por sessão segue vivo em `sessao.completados` e no veredito.
+- **Carta de fase concluída**: pula no centro com o prêmio e some sozinha
+  (1,4 s) — celebração sem clique extra entre fases.
+- **Cromo com cor**: `--realce` (o azul das tintas, promovido a marca) nos
+  botões fortes; cantos arredondados em botões e cartas; **tubos com cara de
+  tubo** no canvas (boca reta, fundo arredondado, líquido recortado pela
+  forma do vidro — no Godot vira `StyleBoxFlat` com `corner_radius`).
+
+## Rodada 4: tema "casa da bruxa" e o caminho de fases
+
+Direção de arte escolhida pela designer: poção / casa da bruxa / mago de
+RPG. E um **override consciente da pesquisa da rodada 3**: o caminho de
+fases entrou mesmo não sendo costume do gênero sort — o motivo declarado é
+a sensação de progresso AO VOLTAR, que é exatamente o que os mapas de
+match-3 entregam. Registrado como aposta da casa, não como consenso.
+
+- **Tema**: pergaminho/madeira de dia, roxo profundo à luz de vela de
+  noite; serifa de grimório nos títulos; roxo místico como cor de marca.
+- **Frascos de poção** no canvas: rolha pousada na boca, fundo bem
+  arredondado, lasca de brilho no vidro — ainda retângulos e cantos.
+- **Caminho de fases**: trilha zigue-zague de baixo pra cima, feitas ✓,
+  atual pulsando, futuras à espreita, sempre 8 nós à frente do jogador.
+  Fluxo: tela inicial → caminho → fase (o relógio da sessão só liga na
+  fase). Nome provisório: **Poções da Bruxa**.
+
+## Rodada 5: assets CC0 de verdade nos botões
+
+Pedido da designer: buscar pacotes de assets gratuitos porque os botões
+procedurais não convenciam. Achado e adotado: **Fantasy UI Borders**
+([Kenney](https://kenney.nl/assets/fantasy-ui-borders), CC0 1.0 — domínio
+público, uso comercial livre, sem exigência de crédito). Os sprites de
+moldura 9-slice viraram `border-image` dos botões e da carta de fase
+concluída, embutidos como data-URI (~200 bytes cada, tingidos por tema:
+marrom no pergaminho, branco na noite) — o jogo segue um arquivo só.
+
+Nota de processo: kenney.nl e opengameart são bloqueados pelo proxy deste
+ambiente; os sprites vieram de um repositório público no GitHub
+(eckz/bevy_flair) que já os embarcava com a licença documentada. No porte
+Godot, o zip completo do pacote (140 sprites) baixa direto do site.
+
+## Rodada 6: cara de jogo de verdade (a régua de instrumentos caiu)
+
+Veto de playtest certeiro: "não tem cara de jogo real, tem cara de jogo
+teste — isso é normal nos jogos que a gente quer monetizar?". Não é. O
+padrão do gênero é: fase no topo, moedas numa pílula, e botões de ÍCONE
+com o preço num badge. Instrumento de pesquisa não aparece na cara do
+jogo — e continua medindo por baixo.
+
+- **Topo**: "Fase N" em gótica no centro (mov/par numa sublinha discreta),
+  pílula de moedas e pílula de sequência (🔥, só aparece quando existe),
+  menu ⚙ à esquerda.
+- **Menu ⚙**: os instrumentos moram ali — som, "Enjoei agora", "Parei
+  aqui". O cronômetro saiu da tela (segue medido no encerrar).
+- **Rodapé**: banner do Desafio do dia + 4 botões de ícone (desfazer,
+  frasco, dica, reiniciar) com badges de preço ("−2", "grátis: 1",
+  "▶ anúncio", "sem saída").
+- **Ícones**: [game-icons.net](https://game-icons.net) — SVGs embutidos,
+  tingidos por CSS.
+
+## Créditos de assets (obrigações de licença)
+
+- **Ícones**: [game-icons.net](https://game-icons.net) — crystal-ball,
+  standing-potion, cycle e cog de **Lorc**; anticlockwise-rotation e
+  two-coins de **Delapouite** — licença
+  [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/).
+- **Molduras de botão**: [Fantasy UI Borders](https://kenney.nl/assets/fantasy-ui-borders)
+  de **Kenney** — CC0 (crédito por cortesia).
+- **Fontes**: [Pirata One](https://fonts.google.com/specimen/Pirata+One) e
+  [Almendra](https://fonts.google.com/specimen/Almendra) (Google Fonts) —
+  licença OFL.
+
+## Rodada 7: playtest real encontra o "sem saída" silencioso
+
+Sessão real (noivo da designer): 30 fases, 22 min, sequência de 27 sem
+quebrar — ótimo dado. Um relato: "Fase 14 não tinha mais movimento".
+
+Investigação nos números da própria sessão (não é chute): board 14 (par
+15, 16 mov.) tem `recipientes extras = 1` naquele índice — ele COMPROU um
+frasco extra ali, e a sequência não quebrou (comprar recipiente congela a
+sequência, não quebra — `premioFinal`/`concluir()`). Isso é exatamente a
+rota de escape de um encalhe (`emprensado()` verdadeiro): ou reinicia, ou
+compra um recipiente extra. **Não era bug** — é o encalhe já medido e
+documentado no próprio código ("9 em 200 partidas aleatórias chegam a beco
+sem saída"), e ele resolveu do jeito certo. O problema era só o AVISO: o
+único sinal era um badge de 10.5px em fonte decorativa embaixo do botão
+Reiniciar — fácil de não notar no calor do jogo, sobretudo na primeira vez.
+
+Correção: um aviso flutuante legível (sans-serif, 13.5px, borda na cor de
+alerta) dispara UMA VEZ na transição pra travado, nomeando as duas rotas de
+escape ("toque em ↻ pra reiniciar, ou compre um frasco"). Não muda a
+mecânica nem a taxa de encalhe — só torna o sinal impossível de perder.
+
+## O que fica pro porte (Godot)
+
+Anotado aqui pra não virar scope creep no protótipo:
+
+- **Partículas** na conclusão do tabuleiro (confete contido, na paleta das
+  tintas do tabuleiro — o cromo segue acromático).
+- **Squash & stretch** no líquido ao assentar.
+- **Vidro com forma de tubo** (cantos arredondados, gargalo) — hoje é
+  retângulo puro por decisão; no Godot vira sprite/shader sem custo.
