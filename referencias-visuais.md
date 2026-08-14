@@ -176,6 +176,27 @@ jogo — e continua medindo por baixo.
   [Almendra](https://fonts.google.com/specimen/Almendra) (Google Fonts) —
   licença OFL.
 
+## Rodada 7: playtest real encontra o "sem saída" silencioso
+
+Sessão real (noivo da designer): 30 fases, 22 min, sequência de 27 sem
+quebrar — ótimo dado. Um relato: "Fase 14 não tinha mais movimento".
+
+Investigação nos números da própria sessão (não é chute): board 14 (par
+15, 16 mov.) tem `recipientes extras = 1` naquele índice — ele COMPROU um
+frasco extra ali, e a sequência não quebrou (comprar recipiente congela a
+sequência, não quebra — `premioFinal`/`concluir()`). Isso é exatamente a
+rota de escape de um encalhe (`emprensado()` verdadeiro): ou reinicia, ou
+compra um recipiente extra. **Não era bug** — é o encalhe já medido e
+documentado no próprio código ("9 em 200 partidas aleatórias chegam a beco
+sem saída"), e ele resolveu do jeito certo. O problema era só o AVISO: o
+único sinal era um badge de 10.5px em fonte decorativa embaixo do botão
+Reiniciar — fácil de não notar no calor do jogo, sobretudo na primeira vez.
+
+Correção: um aviso flutuante legível (sans-serif, 13.5px, borda na cor de
+alerta) dispara UMA VEZ na transição pra travado, nomeando as duas rotas de
+escape ("toque em ↻ pra reiniciar, ou compre um frasco"). Não muda a
+mecânica nem a taxa de encalhe — só torna o sinal impossível de perder.
+
 ## O que fica pro porte (Godot)
 
 Anotado aqui pra não virar scope creep no protótipo:
