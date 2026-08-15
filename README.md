@@ -44,6 +44,38 @@ mediana) encerrando outra sessão sem aviso. Depois do diretor, o pior
 tabuleiro de uma sessão de 22 caiu pra 1,4× a mediana — e picos de dificuldade
 deixaram de expulsar: viraram desafios vencíveis que a sessão atravessa.
 
+## O teste que faltava: uma criança de 7 anos
+
+Onze sessões, e até a décima todas de adulto. A décima primeira foi um
+sobrinho de 7 anos: **21 tabuleiros em 22:43**, o dobro do alvo da sessão.
+Ele joga com um perfil oposto ao dos adultos — 112% do par contra 108%, e
+**30 desfazer contra 38 somados nas seis sessões adultas que registraram
+despejo**. Três
+coisas ficaram sabidas, e nenhuma delas dava pra saber com adultos:
+
+- **A tolerância de ×1,3 é o que segura o gancho de quem ainda erra.** Com
+  ela, 20 dos 21 tabuleiros entraram e a maior sequência foi 11. Com ×1,15
+  seriam 16 e a sequência cairia pra 8. A folga não é generosidade com o
+  placar: é a diferença entre uma criança manter a sequência viva ou perdê-la
+  a cada três tabuleiros.
+- **O desfazer grátis pagou a conta.** Os 2 grátis por tabuleiro absorveram
+  inteiros 4 dos 7 tabuleiros em que ele desfez; os 30 usos custaram 34
+  moedas, 9% do ganho, e a sessão fechou com 380 no banco. O ajuste que
+  nasceu de uma sessão que quebrou com saldo 7 aguentou uma carga de desfazer
+  muito maior que a que o motivou.
+- **A dor mora fora das duas réguas que o jogo tem.** Os dois tabuleiros que
+  mais doeram (114s com 8 desfazer; 100s com 11) tinham score 0,41 — meio da
+  faixa média — e nós do A* abaixo da mediana da sessão; um deles com 223
+  nós, o *menor* da sessão inteira. Nem o score do bot, nem o par, nem o
+  tamanho da busca ordenam o tempo dele (|ρ|<0,3 em todos). O diretor filtra
+  a cauda catastrófica, e isso ele fez: pior tabuleiro em 1,97× a mediana,
+  nenhuma parede. Mas ele não mede o que confunde uma criança — para isso
+  não existe régua no jogo hoje.
+
+E o fim da sessão não foi expulsão: o 22º tabuleiro foi abandonado com **0
+movimento, 0 despejo e 18 segundos**, num par 18 — a mediana da própria
+sessão. Ninguém perdeu uma luta ali; a brincadeira acabou.
+
 ## A economia — o que sobreviveu e o que não
 
 **A moeda não compra mais moeda.** A primeira versão tinha uma melhoria de
@@ -105,7 +137,7 @@ Importa a lógica pura **direto de `index.html`** (fonte única — não existe
 cópia pra divergir) e escreve `testes/evidencias.md`. Roda em CI a cada push
 (`.github/workflows/testes.yml`). Cobre: invariantes sob partidas aleatórias,
 exatidão do solver, estatística do gerador, distribuição do score de
-dificuldade, **dados reais de dez sessões de playtest embutidos** (com os
+dificuldade, **dados reais de onze sessões de playtest embutidos** (com os
 layouts exatos, pra validar o bot contra humano sem transitividade),
 comportamento do diretor, simulação de economia, determinismo do desafio do
 dia, otimalidade da dica, e regressão de cada bug que o playtest achou.
