@@ -11,7 +11,7 @@ Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica t
   ✓ par confirmado descendo o gradiente em 6/6 tabuleiros (deu 6/6)
 
 ## 3. Gerador (200 tabuleiros, 6 cores)
-Tempo: 2796 ms no total (14.0 ms/tabuleiro).
+Tempo: 2797 ms no total (14.0 ms/tabuleiro).
 Par: mín 13, mediana 18, máx 21.
   ✓ nenhum tabuleiro insolúvel ou trivial servido
   ✓ geração média abaixo de 150 ms (não trava navegador)
@@ -69,6 +69,27 @@ Preditores contra o tempo dele: score servido ρ=0.06, par ρ=0.09, nós do A* �
   tab 17: 100s, 23/18 mov, 11 desfazer, 223 nós, score 0.41 (media).
   tab 12: 114s, 25/18 mov, 8 desfazer, 881 nós, score 0.41 (media).
   ✓ os 2 tabuleiros que mais doeram tinham score E nós do A* abaixo da mediana da sessão — a dificuldade sentida por uma criança mora fora das duas réguas que o jogo tem
+
+## 5d. Leitura do tabuleiro — a terceira régua
+  ✓ tabuleiro resolvido lê zero: sem quebra, sem cor enterrada, e nenhum topo cobrado (tubo já uniforme não pede leitura)
+  ✓ tubo listrado lê mais que tubo quase arrumado (6 quebras contra 2) — a régua enxerga a bagunça, não o tamanho da solução
+  ✓ célula enterrada = a que tem cor diferente por cima (3 num tubo 0-0-0-1)
+
+| sessão | n | leitura×tempo | par×tempo | nós×tempo |
+|---|---|---|---|---|
+| s8-A-9tab-diretor | 9 | 0.70 | 0.02 | -0.22 |
+| s9-B-22tab-diretor | 22 | 0.46 | 0.53 | 0.54 |
+| s10-16tab-recipiente | 16 | 0.75 | 0.51 | 0.24 |
+| s11-C-21tab-crianca | 21 | 0.12 | 0.09 | -0.05 |
+
+Adultos agrupados (n=47): leitura ρ=0.60, par ρ=0.42, nós ρ=0.29.
+Criança (n=21): leitura ρ=0.12, par ρ=0.09, nós ρ=-0.05.
+  ✓ nos adultos a leitura prevê o tempo melhor que as duas réguas antigas (0.60 contra 0.42 do par e 0.29 dos nós) — é por isso que ela entra
+
+**O resultado honesto:** a régua nasceu pra explicar a sessão da criança e não explica. Ela prevê o tempo dos adultos melhor que tudo que havia, e na criança fica em 0.12 — não é restrição de faixa (o desvio da leitura na sessão dela é o mesmo das adultas), é ausência de sinal. O que confundiu uma criança de 7 anos continua sem régua; a hipótese de que era bagunça visual foi testada e não passou.
+Independência (n=68): leitura×par ρ=0.48, leitura×nós ρ=0.23.
+  ✓ a leitura não é o par nem os nós disfarçados (|ρ|<0,7 com ambos) — mede outra coisa
+  ✓ o diretor serve o mesmo tabuleiro de antes: a leitura é instrumento, não entra na escolha
 
 ## 6. Diretor: 3 sessões simuladas de 12 tabuleiros
 leve: 15 servidos, score médio 0.18

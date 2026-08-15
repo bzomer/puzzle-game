@@ -69,8 +69,45 @@ coisas ficaram sabidas, e nenhuma delas dava pra saber com adultos:
   nós, o *menor* da sessão inteira. Nem o score do bot, nem o par, nem o
   tamanho da busca ordenam o tempo dele (|ρ|<0,3 em todos). O diretor filtra
   a cauda catastrófica, e isso ele fez: pior tabuleiro em 1,97× a mediana,
-  nenhuma parede. Mas ele não mede o que confunde uma criança — para isso
-  não existe régua no jogo hoje.
+  nenhuma parede. Mas ele não mede o que confunde uma criança.
+
+## A terceira régua: leitura do tabuleiro
+
+O achado acima virou uma hipótese testável — *se a dor não é de busca, talvez
+seja de leitura* — e a hipótese virou código. `medirLeitura()` conta três
+coisas que dá pra ver na tela sem simular jogada nenhuma:
+
+- **quebras**: trocas de cor dentro dos tubos (tubo listrado cansa de ler);
+- **enterrado**: células com cor diferente por cima (o que está fora de alcance);
+- **topos**: cores distintas no topo dos tubos *ainda não prontos* — o tamanho
+  da varredura pra achar um par que case. Tubo já uniforme não conta, senão um
+  tabuleiro resolvido pontuaria no máximo.
+
+Cada um vira fração do seu máximo estrutural e o score é a média dos três.
+Nenhum peso foi ajustado aos dados: a fórmula foi declarada antes de olhar
+correlação.
+
+**O resultado não foi o esperado, e é o mais interessante da coisa.** Medida
+contra as quatro sessões que têm layout exato (68 tabuleiros):
+
+| | leitura | par | nós do A\* |
+|---|---|---|---|
+| **adultos** (n=47) | **0,60** | 0,42 | 0,29 |
+| **criança** (n=21) | 0,12 | 0,09 | −0,05 |
+
+(ρ de Spearman contra o tempo, agrupado por posto dentro de cada sessão.)
+
+A régua nasceu pra explicar a sessão da criança e **não explica**. O que ela
+faz é prever o tempo dos *adultos* melhor que qualquer coisa que o projeto
+tinha — inclusive numa sessão onde o par não previa nada (s8: par ρ=0,02,
+leitura ρ=0,70). E não é restrição de faixa no caso da criança: o desvio da
+leitura na sessão dela é igual ao das adultas, então é ausência de sinal
+mesmo. A hipótese da bagunça visual foi testada e não passou; o que confunde
+uma criança de 7 anos segue sem régua.
+
+Por isso ela **não entra no diretor** — nada aqui muda que tabuleiro é
+servido. É instrumento: sai no resumo copiável, um valor por tabuleiro, pra
+que a próxima sessão traga n suficiente pra decidir alguma coisa.
 
 E o fim da sessão não foi expulsão: o 22º tabuleiro foi abandonado com **0
 movimento, 0 despejo e 18 segundos**, num par 18 — a mediana da própria
@@ -140,7 +177,8 @@ exatidão do solver, estatística do gerador, distribuição do score de
 dificuldade, **dados reais de onze sessões de playtest embutidos** (com os
 layouts exatos, pra validar o bot contra humano sem transitividade),
 comportamento do diretor, simulação de economia, determinismo do desafio do
-dia, otimalidade da dica, e regressão de cada bug que o playtest achou.
+dia, otimalidade da dica, o poder preditivo da régua de leitura contra o tempo
+humano real, e regressão de cada bug que o playtest achou.
 
 **`testes/e2e.mjs`** — o jogo jogado por um navegador de verdade
 (Playwright/Chromium): resolve tabuleiros clicando nos tubos pelo caminho
