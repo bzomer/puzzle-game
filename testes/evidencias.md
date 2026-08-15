@@ -11,7 +11,7 @@ Gerado por `testes/harness.mjs` (rng com semente — reprodutível). A lógica t
   ✓ par confirmado descendo o gradiente em 6/6 tabuleiros (deu 6/6)
 
 ## 3. Gerador (200 tabuleiros, 6 cores)
-Tempo: 2291 ms no total (11.5 ms/tabuleiro).
+Tempo: 2796 ms no total (14.0 ms/tabuleiro).
 Par: mín 13, mediana 18, máx 21.
   ✓ nenhum tabuleiro insolúvel ou trivial servido
   ✓ geração média abaixo de 150 ms (não trava navegador)
@@ -23,12 +23,12 @@ Tabuleiros acima do TETO_PAREDE (1.7) no gerador cru: 0/120 (0%) — é o que o 
 Correlações no mesmo conjunto: score×par ρ=0.32, score×nós ρ=0.16 — o bot mede outra coisa além do tamanho da solução.
   ✓ o score discrimina (não é constante)
 
-## 5. Dados humanos (5 sessões, 66 tabuleiros): o que prevê o tempo
+## 5. Dados humanos adultos: o que prevê o tempo
 tempo×par: ρ=0.56 (n=105)
 tempo×nós do A*: ρ=0.39 (n=57)
 tempo×(movimentos/par): ρ=-0.25 (n=105)
 
-**Correção que este harness impôs:** a conclusão anterior do projeto ("o par não prevê a dificuldade sentida") estava errada no agregado — com 61 tabuleiros, o par carrega sinal claro (ρ≈0,56). Ela parecia verdadeira dentro de cada sessão porque o gerador servia par quase constante (14–21, moda 19): sem variação, nenhuma correlação aparece. O que CONTINUA verdade, e importa mais: as catástrofes escapam do par.
+**Correção que este harness impôs:** a conclusão anterior do projeto ("o par não prevê a dificuldade sentida") estava errada no agregado — com 105 tabuleiros, o par carrega sinal claro (ρ=0.56). Ela parecia verdadeira dentro de cada sessão porque o gerador servia par quase constante (14–21, moda 19): sem variação, nenhuma correlação aparece. O que CONTINUA verdade, e importa mais: as catástrofes escapam do par.
 Os 2 piores tempos (182s e 149s) tinham par 19 e 19 — ambos ≤ Q75 dos pares (19). O papel do bot no diretor é este: detectar a armadilha de busca que o par não vê (Kristensen et al. 2024: simulado + humano > qualquer um sozinho). Validação direta bot×humano vem das próximas sessões: o resumo copiável agora carrega os layouts exatos servidos.
   ✓ par carrega sinal no agregado (ρ>0,3) — corrigindo a conclusão anterior do projeto
   ✓ as 2 piores lutas humanas tinham par comum (≤Q75) — a cauda é invisível ao par; daí o bot
@@ -46,10 +46,29 @@ s9-B-22tab-diretor (n=22): score-bot(50 rod.) ρ=0.15, par ρ=0.53, ordem ρ=-0.
   ✓ s10-16tab-recipiente: economia (streak + resgates) reproduz a sessão à moeda (273 = 273)
   ✓ s10-16tab-recipiente: maior sequência reproduzida (13 = 13)
 s10-16tab-recipiente (n=16): score-bot(50 rod.) ρ=0.07, par ρ=0.51, ordem ρ=-0.00.
+  ✓ s11-C-21tab-crianca: cadeia serializar→desserializar→solver íntegra (21/21)
+  ✓ s11-C-21tab-crianca: economia (streak + resgates + desafio) reproduz a sessão à moeda (388 = 388)
+  ✓ s11-C-21tab-crianca: maior sequência reproduzida (11 = 11)
+s11-C-21tab-crianca (n=21): score-bot(50 rod.) ρ=0.18, par ρ=0.09, ordem ρ=0.22.
 
-Leitura das duas primeiras sessões pós-diretor: dentro da faixa segura, o par segue o melhor preditor grosso do tempo (ρ 0,53 no jogador B, n=22); o score do bot prevê pouco o tempo (0,02 e 0,25) — o papel dele é o filtro da cauda, não a régua fina. E o estado da pessoa pesa: na jogadora A o tempo subiu com a ordem (fadiga, ρ 0,68); no jogador B caiu (aprendizado, ρ −0,17), com as pesadas despencando de 149s na primeira para ~47s nas últimas.
+Leitura das quatro sessões pós-diretor: dentro da faixa segura, o par segue o melhor preditor grosso do tempo entre os adultos (ρ 0,53 e 0,51, n=22 e 16); o score do bot prevê pouco o tempo em todas elas (−0,03 a 0,18) — o papel dele é o filtro da cauda, não a régua fina. E o estado da pessoa pesa mais que o tabuleiro: na jogadora A o tempo subiu com a ordem (fadiga, ρ 0,68); no jogador B caiu (aprendizado, ρ −0,17), com as pesadas despencando de 149s na primeira para ~47s nas últimas. Na criança (s11) o par também desaba como preditor (ρ 0,09): quem ainda está aprendendo a ler o tabuleiro não gasta o tempo onde a busca é grande, e sim onde a leitura confunde — ver 5c.
   ✓ s8: sem parede (pior 1.4× a mediana; era 4,4× pré-diretor)
   ✓ s9: o pico (149s) foi resolvido NO PAR e a sessão seguiu por mais 16 tabuleiros — desafio vencível ≠ buraco negro
+
+## 5c. A sessão da criança (7 anos): o que ela testa que as outras não
+n=21 tabuleiros em 22:43 (alvo da sessão: 10), mediana 58s. Precisão 112% do par contra 108% dos adultos; 30 desfazer contra 38 somados nas 6 sessões adultas que registraram despejo.
+  ✓ desfazer: os 30 usos custam exatamente as 34 moedas relatadas — despejos−movimentos reconstrói o uso tabuleiro a tabuleiro, então a conta fecha sem precisar acreditar no resumo
+  ✓ os 2 grátis por tabuleiro absorveram 4/7 dos tabuleiros com desfazer — a rajada custa, o tropeço não
+  ✓ mesmo com 30 desfazer, o custo é 9% do ganho (saldo final 380) — o jogador impreciso não quebra
+Tolerância ×1.3: 20/21 dentro, maior sequência 11. Com ×1,15 seria 16/21 e sequência 8.
+  ✓ a tolerância ×1.3 é o que mantém a sequência viva numa criança (11 contra 8 se fosse ×1,15) — o gancho não exige precisão adulta
+  ✓ sem parede: pior tabuleiro 1.97× a mediana (era 4,4× pré-diretor)
+  ✓ o abandono foi saciedade, não parede: par 18 (mediana da sessão 18), 0 movimento e 0 despejo em 18s — não houve luta perdida, houve fim de brincadeira
+Preditores contra o tempo dele: score servido ρ=0.06, par ρ=0.09, nós do A* ρ=-0.05.
+  ✓ nenhum preditor da máquina ordena o tempo deste jogador (|ρ|<0,3 em todos) — o diretor filtra a cauda, não mede a experiência de uma criança
+  tab 17: 100s, 23/18 mov, 11 desfazer, 223 nós, score 0.41 (media).
+  tab 12: 114s, 25/18 mov, 8 desfazer, 881 nós, score 0.41 (media).
+  ✓ os 2 tabuleiros que mais doeram tinham score E nós do A* abaixo da mediana da sessão — a dificuldade sentida por uma criança mora fora das duas réguas que o jogo tem
 
 ## 6. Diretor: 3 sessões simuladas de 12 tabuleiros
 leve: 15 servidos, score médio 0.18

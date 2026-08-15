@@ -40,8 +40,9 @@ function rngCom(semente) {
 }
 
 // ── dados humanos: as sessões de playtest, por tabuleiro ────────────────
-// Copiados dos resumos das sessões reais. j = jogador (A/B), t = segundos,
+// Copiados dos resumos das sessões reais. j = jogador (A/B/C), t = segundos,
 // m = movimentos da solução, d = despejos totais, nos = nós do A*, p = par.
+// C = criança (7 anos) — perfil novo, não misturar com A/B nas médias.
 const HUMANOS = [
   { id: "s3-A-17tab", j: "A",
     t: [48,26,32,44,46,49,32,49,24,39,23,57,37,56,48,34,40],
@@ -124,7 +125,39 @@ const HUMANOS = [
       "1533-1455-0040-3414-5223-2201-- 0351-2322-0004-5434-5312-1514-- " +
       "3001-0515-2043-2124-1554-3234-- 4453-4251-5310-0233-2154-0210-- " +
       "4121-2403-5503-0034-2151-5342-- 1245-0225-2053-1140-5334-4310--").split(" ") },
+  // o primeiro jogador que não é adulto: sobrinho de 7 anos. 21 tabuleiros
+  // (alvo 10) em 22:43, e a primeira sessão com o desafio do dia completado —
+  // por isso ganhoRelatado inclui o bônus. Perfil oposto ao dos adultos: 30
+  // desfazer (contra ~0) e 112% do par (contra ~105%), mas 20/21 dentro da
+  // tolerância. O abandono do 22º foi com 0 movimento e 0 despejo em 18s,
+  // num par 18 — a mediana da própria sessão. Não é parede: é hora de parar.
+  { id: "s11-C-21tab-crianca", j: "C", idade: 7,
+    t: [62,44,67,49,38,54,65,40,71,61,57,114,45,37,54,75,100,58,34,77,65],
+    m: [20,19,19,18,18,21,21,21,24,18,20,25,21,17,23,23,23,20,19,22,21],
+    d: [22,19,21,19,18,21,21,21,24,20,20,33,21,17,23,23,34,20,19,26,21],
+    nos: [2219,835,1435,543,1217,1464,373,2812,2171,303,2643,881,3408,377,541,845,223,1489,345,666,1810],
+    p: [19,18,18,17,18,18,18,20,20,17,19,18,21,16,20,18,18,18,19,18,19],
+    ganhoRelatado: 388, maiorSeq: 11, bonusDesafio: true,
+    gastoDesfazerRelatado: 34, saldoFinal: 380,
+    scoresServidos: [0.11,0.26,0.30,0.63,0.63,1.15,0.26,0.50,0.46,0.98,0.41,
+      0.41,0.35,0.86,0.09,0.76,0.41,0.83,0.14,0.85,0.80],
+    recipientes: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],
+    faixas: ["leve","leve","leve","media","media","pesada","leve","media","media","pesada","leve","media","media","pesada","leve","media","media","pesada","leve","media","desafio"],
+    // o 22º, abandonado: par 18, 0 movimento, 0 despejo, 0 desfazer, 18 s
+    abandonado: { par: 18, movimentos: 0, despejos: 0, desfazer: 0, t: 18 },
+    layouts: ("0040-1505-4521-3441-3231-3252-- 0531-1324-4142-2533-5105-4002-- " +
+      "5210-0210-4424-3351-1245-3530-- 1102-4215-2043-1330-5344-2550-- " +
+      "1205-0054-5212-3314-3425-0341-- 3305-0340-5254-1304-1251-4122-- " +
+      "5034-2014-0255-3342-3015-4121-- 1454-5131-2510-2420-5420-3033-- " +
+      "2313-0302-5241-1014-5254-4530-- 3114-5502-0344-5311-0242-3205-- " +
+      "0143-4244-5110-0201-3252-5353-- 2414-0533-1301-0232-4551-4520-- " +
+      "4031-0505-3133-4252-4151-0242-- 4255-2441-3510-3224-1330-0510-- " +
+      "2534-3154-0325-5201-3124-1040-- 0013-0524-1425-4543-3220-3151-- " +
+      "0123-2013-1540-2344-4125-0355-- 2411-5153-0102-4452-2303-0354-- " +
+      "1051-3215-0433-4523-5024-4102-- 2545-0425-3500-1324-1401-3312-- " +
+      "4551-0403-1320-5321-0231-5424--").split(" ") },
 ];
+const ADULTOS = HUMANOS.filter(h => h.j !== "C");
 
 // ── utilidades ──────────────────────────────────────────────────────────
 const soma = a => a.reduce((x, y) => x + y, 0);
@@ -258,13 +291,15 @@ let SCORES = [];
 }
 
 // ═══ 5. dados humanos: o que prevê o tempo? ═════════════════════════════
-diga("\n## 5. Dados humanos (5 sessões, 66 tabuleiros): o que prevê o tempo");
+diga("\n## 5. Dados humanos adultos: o que prevê o tempo");
 {
   // pooled, excluindo o 1º tabuleiro de cada sessão (aquecimento/aprendizado
-  // contamina: os dois piores tempos da história foram 1ºs tabuleiros)
+  // contamina: os dois piores tempos da história foram 1ºs tabuleiros).
+  // Só ADULTOS: a sessão da criança tem outra linha de base de velocidade e
+  // misturar perfis inventaria correlação onde só há diferença entre pessoas.
   const T = [], P = [], FOLGA = [];
   const Tn = [], NOS = [];
-  for (const h of HUMANOS) {
+  for (const h of ADULTOS) {
     for (let i = 1; i < h.t.length; i++) {
       T.push(h.t[i]); P.push(h.p[i]); FOLGA.push(h.m[i] / h.p[i]);
       if (h.nos) { Tn.push(h.t[i]); NOS.push(h.nos[i]); }
@@ -277,7 +312,7 @@ diga("\n## 5. Dados humanos (5 sessões, 66 tabuleiros): o que prevê o tempo");
   diga("");
   diga("**Correção que este harness impôs:** a conclusão anterior do projeto " +
        "(\"o par não prevê a dificuldade sentida\") estava errada no agregado — " +
-       "com 61 tabuleiros, o par carrega sinal claro (ρ≈0,56). Ela parecia " +
+       `com ${T.length} tabuleiros, o par carrega sinal claro (ρ=${rPar.toFixed(2)}). Ela parecia ` +
        "verdadeira dentro de cada sessão porque o gerador servia par quase " +
        "constante (14–21, moda 19): sem variação, nenhuma correlação aparece. " +
        "O que CONTINUA verdade, e importa mais: as catástrofes escapam do par.");
@@ -321,8 +356,10 @@ diga("\n## 5b. Validação direta — sessões com os tabuleiros exatos");
         seq++; maxSeq = Math.max(maxSeq, seq);
       } else seq = 0;
     });
+    // o desafio do dia paga por fora da fórmula do tabuleiro
+    if (sx.bonusDesafio) ganho += G.CONFIG.DESAFIO_BONUS_MOEDAS;
     afirma(ganho === sx.ganhoRelatado,
-      `${sx.id}: economia (streak + resgates) reproduz a sessão à moeda (${ganho} = ${sx.ganhoRelatado})`);
+      `${sx.id}: economia (streak + resgates${sx.bonusDesafio ? " + desafio" : ""}) reproduz a sessão à moeda (${ganho} = ${sx.ganhoRelatado})`);
     afirma(maxSeq === sx.maiorSeq, `${sx.id}: maior sequência reproduzida (${maxSeq} = ${sx.maiorSeq})`);
     const ordem = sx.t.map((_, i) => i + 1);
     diga(`${sx.id} (n=${sx.t.length}): score-bot(50 rod.) ρ=${spearman(scores50, sx.t).toFixed(2)}, ` +
@@ -330,13 +367,16 @@ diga("\n## 5b. Validação direta — sessões com os tabuleiros exatos");
          `ordem ρ=${spearman(ordem, sx.t).toFixed(2)}.`);
   }
   diga("");
-  diga("Leitura das duas primeiras sessões pós-diretor: dentro da faixa segura, " +
-       "o par segue o melhor preditor grosso do tempo (ρ 0,53 no jogador B, " +
-       "n=22); o score do bot prevê pouco o tempo (0,02 e 0,25) — o papel dele " +
-       "é o filtro da cauda, não a régua fina. E o estado da pessoa pesa: na " +
-       "jogadora A o tempo subiu com a ordem (fadiga, ρ 0,68); no jogador B " +
-       "caiu (aprendizado, ρ −0,17), com as pesadas despencando de 149s na " +
-       "primeira para ~47s nas últimas.");
+  diga("Leitura das quatro sessões pós-diretor: dentro da faixa segura, o par " +
+       "segue o melhor preditor grosso do tempo entre os adultos (ρ 0,53 e " +
+       "0,51, n=22 e 16); o score do bot prevê pouco o tempo em todas elas " +
+       "(−0,03 a 0,18) — o papel dele é o filtro da cauda, não a régua fina. " +
+       "E o estado da pessoa pesa mais que o tabuleiro: na jogadora A o tempo " +
+       "subiu com a ordem (fadiga, ρ 0,68); no jogador B caiu (aprendizado, " +
+       "ρ −0,17), com as pesadas despencando de 149s na primeira para ~47s nas " +
+       "últimas. Na criança (s11) o par também desaba como preditor (ρ 0,09): " +
+       "quem ainda está aprendendo a ler o tabuleiro não gasta o tempo onde a " +
+       "busca é grande, e sim onde a leitura confunde — ver 5c.");
   // s8: sem parede
   const s8 = HUMANOS.find(h => h.id.startsWith("s8"));
   const pior8 = Math.max(...s8.t) / quantil(s8.t, 0.5);
@@ -346,6 +386,89 @@ diga("\n## 5b. Validação direta — sessões com os tabuleiros exatos");
   const iPior = s9.t.indexOf(Math.max(...s9.t));
   afirma(s9.m[iPior] === s9.p[iPior] && s9.t.length - iPior > 10,
     `s9: o pico (${s9.t[iPior]}s) foi resolvido NO PAR e a sessão seguiu por mais ${s9.t.length - 1 - iPior} tabuleiros — desafio vencível ≠ buraco negro`);
+}
+
+// ═══ 5c. o primeiro jogador criança (7 anos) ════════════════════════════
+diga("\n## 5c. A sessão da criança (7 anos): o que ela testa que as outras não");
+{
+  const c = HUMANOS.find(h => h.j === "C");
+  const n = c.t.length;
+  const folga = c.m.map((m, i) => m / c.p[i]);
+  const desfazer = c.d.map((d, i) => d - c.m[i]);
+  const medAdulto = media(ADULTOS.flatMap(h => h.m.map((m, i) => m / h.p[i])));
+  // só s3 e s4 são velhas demais pra ter despejo registrado — o desfazer
+  // delas é desconhecido, não zero; a comparação exclui as duas.
+  const comDespejo = ADULTOS.filter(h => h.d);
+  diga(`n=${n} tabuleiros em 22:43 (alvo da sessão: ${G.CONFIG.TABULEIROS_ALVO}), ` +
+       `mediana ${quantil(c.t, 0.5)}s. Precisão ${(media(folga) * 100).toFixed(0)}% do par ` +
+       `contra ${(medAdulto * 100).toFixed(0)}% dos adultos; ` +
+       `${soma(desfazer)} desfazer contra ${soma(comDespejo.map(h => soma(h.d) - soma(h.m)))} ` +
+       `somados nas ${comDespejo.length} sessões adultas que registraram despejo.`);
+
+  // 1. o desfazer: a conta fecha na moeda, e é a prova de campo do grátis×2
+  let gasto = 0;
+  desfazer.forEach((qtd, i) => {
+    for (let k = 0; k < qtd; k++) gasto += G.custoDesfazerPuro(i, k);
+  });
+  const tabsComDesfazer = desfazer.filter(x => x > 0).length;
+  const cobertosPeloGratis = desfazer.filter(x => x > 0 && x <= G.CONFIG.DESFAZER_GRATIS).length;
+  afirma(gasto === c.gastoDesfazerRelatado,
+    `desfazer: os ${soma(desfazer)} usos custam exatamente as ${c.gastoDesfazerRelatado} moedas relatadas — ` +
+    "despejos−movimentos reconstrói o uso tabuleiro a tabuleiro, então a conta " +
+    "fecha sem precisar acreditar no resumo");
+  afirma(cobertosPeloGratis / tabsComDesfazer >= 0.5,
+    `os 2 grátis por tabuleiro absorveram ${cobertosPeloGratis}/${tabsComDesfazer} dos tabuleiros com desfazer — ` +
+    "a rajada custa, o tropeço não");
+  afirma(gasto / c.ganhoRelatado < 0.15,
+    `mesmo com ${soma(desfazer)} desfazer, o custo é ${(gasto / c.ganhoRelatado * 100).toFixed(0)}% do ganho ` +
+    `(saldo final ${c.saldoFinal}) — o jogador impreciso não quebra`);
+
+  // 2. a tolerância é o que salva a sequência de quem erra mais
+  const dentroCom = tol => {
+    let dentro = 0, seq = 0, max = 0;
+    c.p.forEach((par, i) => {
+      if (c.m[i] <= Math.round(par * tol)) { dentro++; seq++; max = Math.max(max, seq); }
+      else seq = 0;
+    });
+    return { dentro, max };
+  };
+  const atual = dentroCom(G.CONFIG.TOLERANCIA_PAR), apertado = dentroCom(1.15);
+  diga(`Tolerância ×${G.CONFIG.TOLERANCIA_PAR}: ${atual.dentro}/${n} dentro, maior sequência ${atual.max}. ` +
+       `Com ×1,15 seria ${apertado.dentro}/${n} e sequência ${apertado.max}.`);
+  afirma(atual.dentro >= n - 1 && atual.max > apertado.max,
+    `a tolerância ×${G.CONFIG.TOLERANCIA_PAR} é o que mantém a sequência viva numa criança ` +
+    `(${atual.max} contra ${apertado.max} se fosse ×1,15) — o gancho não exige precisão adulta`);
+
+  // 3. o fim da sessão NÃO foi parede
+  const pior = Math.max(...c.t) / quantil(c.t, 0.5);
+  const parMediano = quantil(c.p, 0.5);
+  afirma(pior < 2, `sem parede: pior tabuleiro ${pior.toFixed(2)}× a mediana (era 4,4× pré-diretor)`);
+  afirma(c.abandonado.movimentos === 0 && c.abandonado.despejos === 0 &&
+         c.abandonado.par <= parMediano,
+    `o abandono foi saciedade, não parede: par ${c.abandonado.par} (mediana da sessão ${parMediano}), ` +
+    `0 movimento e 0 despejo em ${c.abandonado.t}s — não houve luta perdida, houve fim de brincadeira`);
+
+  // 4. nada que a máquina mede ordenou o tempo DELA
+  const rs = {
+    "score servido": spearman(c.scoresServidos, c.t),
+    "par": spearman(c.p, c.t),
+    "nós do A*": spearman(c.nos, c.t),
+  };
+  diga("Preditores contra o tempo dele: " +
+       Object.entries(rs).map(([k, v]) => `${k} ρ=${v.toFixed(2)}`).join(", ") + ".");
+  afirma(Object.values(rs).every(v => Math.abs(v) < 0.3),
+    "nenhum preditor da máquina ordena o tempo deste jogador (|ρ|<0,3 em todos) — " +
+    "o diretor filtra a cauda, não mede a experiência de uma criança");
+
+  // 5. onde a dor realmente ficou: nos tabuleiros que a máquina achou fáceis
+  const piores = desfazer.map((x, i) => [x, i]).sort((a, b) => b[0] - a[0]).slice(0, 2).map(([, i]) => i);
+  const scoreMediano = quantil(c.scoresServidos, 0.5);
+  const nosMediano = quantil(c.nos, 0.5);
+  piores.forEach(i => diga(`  tab ${i + 1}: ${c.t[i]}s, ${c.m[i]}/${c.p[i]} mov, ${desfazer[i]} desfazer, ` +
+    `${c.nos[i]} nós, score ${c.scoresServidos[i]} (${c.faixas[i]}).`));
+  afirma(piores.every(i => c.scoresServidos[i] <= scoreMediano && c.nos[i] <= nosMediano),
+    "os 2 tabuleiros que mais doeram tinham score E nós do A* abaixo da mediana da sessão — " +
+    "a dificuldade sentida por uma criança mora fora das duas réguas que o jogo tem");
 }
 
 // ═══ 6. diretor de dificuldade ══════════════════════════════════════════
