@@ -220,6 +220,14 @@ FAIXAS: { leve, media, pesada }, TETO_PAREDE: 1.7,
 CC0); fontes Pirata One e Almendra (Google Fonts, OFL). Detalhes e
 histórico das decisões visuais em `referencias-visuais.md`.
 
+## Quem lidera o gênero
+
+Quem ganha dinheiro com puzzle nos portais, quanto, e o que dá pra copiar sem
+virar clone: [`lideres-do-genero.md`](lideres-do-genero.md). Resumo — o líder é
+**block puzzle** (Block Blast, só anúncio, D1 de 26,1 %), o nosso subgênero
+(sort) é o que mais depende de anúncio dos três de topo, e o buraco medido aqui
+é que **nunca medimos D1 fora do playtest**.
+
 ## Origem
 
 Nasceu como protótipo de um item da pesquisa e proposta de próximo jogo em
