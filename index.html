@@ -872,6 +872,9 @@ const sessao = {
   layouts: [],
   faixas: [],
   scoresDif: [],
+  // leitura do tabuleiro servido — a régua nova, só registrada: não decide
+  // nada no jogo, existe pra próxima sessão trazer n pra decidir
+  leitura: [],
   recipientes: [],
   gastoRecipientes: 0,
   // Momento em que a pessoa DECLARA tédio, separado do momento em que para.
@@ -1127,6 +1130,48 @@ function medirDificuldade(tubosIniciais, par, rodadas = 12, rng = Math.random) {
   const score = (1 - resolvidos / rodadas) * 1.5 + Math.max(0, excesso - 1);
   return { score, taxaBeco: becos / rodadas,
            taxaResolve: resolvidos / rodadas, excesso };
+}
+
+/* ─────────────── leitura do tabuleiro (pura) ───────────────
+   As duas réguas que o jogo tinha — o par (tamanho da solução) e o score do
+   bot (taxa de beco) — medem BUSCA. Esta mede outra coisa: quanto trabalho
+   dá pra LER o tabuleiro antes de procurar jogada nenhuma. Motivo de existir:
+   na sessão da criança de 7 anos os dois tabuleiros que mais doeram tinham
+   score 0,41 e nós do A* abaixo da mediana — um deles o MENOR da sessão. A
+   dificuldade sentida estava fora das duas réguas.
+
+   Três contagens, todas visíveis na tela sem simular nada:
+     quebras   — trocas de cor dentro dos tubos (tubo listrado cansa de ler)
+     enterrado — células com cor diferente por cima (o que está fora de alcance)
+     topos     — cores distintas no topo dos tubos AINDA não prontos; é o
+                 tamanho da varredura pra achar um par que case. Tubo já
+                 uniforme não entra: ele não pede leitura nenhuma, e sem essa
+                 ressalva um tabuleiro RESOLVIDO pontuaria no máximo.
+
+   Medida contra as 4 sessões com layout exato (ver harness, bateria 5d):
+   prevê o tempo dos adultos melhor que qualquer régua anterior (ρ 0,60
+   contra 0,42 do par e 0,29 dos nós, n=47), e NÃO prevê o da criança
+   (ρ 0,12) — o que a confundiu segue sem régua. Por isso ela é instrumento
+   e não entra no diretor: nada aqui muda que tabuleiro é servido.        */
+
+function medirLeitura(tubos) {
+  let quebras = 0, enterrado = 0;
+  const topos = new Set();
+  for (const t of tubos) {
+    if (!t.length) continue;
+    if (!t.every(c => c === t[0])) topos.add(t[t.length - 1]);
+    for (let i = 1; i < t.length; i++) if (t[i] !== t[i - 1]) quebras++;
+    for (let i = 0; i < t.length; i++)
+      for (let k = i + 1; k < t.length; k++)
+        if (t[k] !== t[i]) { enterrado++; break; }
+  }
+  // Máximos estruturais, não constantes de ajuste: com CORES cores e
+  // CAPACIDADE por tubo, no limite toda célula está misturada menos uma por
+  // cor, e no máximo CORES topos diferentes existem.
+  const mistura = CONFIG.CORES * CONFIG.CAPACIDADE - CONFIG.CORES;
+  const score = (quebras / mistura + enterrado / mistura +
+                 topos.size / CONFIG.CORES) / 3;
+  return { quebras, enterrado, topos: topos.size, score };
 }
 
 /* ─────────────── diretor de dificuldade (puro) ───────────────
@@ -1635,6 +1680,7 @@ function novoTabuleiro(especial) {
   jogo.faixa = servido.faixa || "?";
   jogo.scoreDif = servido.dificuldade ? servido.dificuldade.score : -1;
   jogo.layoutInicial = serializar(servido.tubos);
+  jogo.leitura = medirLeitura(servido.tubos);
   const nos = servido.nos;
   // Nós expandidos pelo A*: hipótese de que medem a dificuldade de BUSCA, que
   // o par não mede. O tab. 8 da 5ª sessão tinha par 17 (abaixo da média) e
@@ -1670,6 +1716,7 @@ function concluir() {
   sessao.layouts.push(jogo.layoutInicial || "");
   sessao.faixas.push(jogo.faixa || "?");
   sessao.scoresDif.push(jogo.scoreDif >= 0 ? jogo.scoreDif.toFixed(2) : "?");
+  sessao.leitura.push(jogo.leitura ? jogo.leitura.score.toFixed(3) : "?");
   sessao.recipientes.push(jogo.recipienteComprado ? 1 : 0);
 
   // O prêmio é proporcional à proximidade do par (não a movimentos
@@ -2152,6 +2199,7 @@ function encerrar() {
     "\nNós do solver: " + sessao.nos.join(", ") +
     "\nFaixas: " + sessao.faixas.join(", ") +
     "\nScores de dificuldade: " + sessao.scoresDif.join(", ") +
+    "\nLeitura do tabuleiro: " + sessao.leitura.join(", ") +
     "\nRecipientes extras: " + sessao.recipientes.join(", ") +
     "\nDicas/Anúncios/Desafio: " + sessao.dicas + "/" + sessao.anuncios + "/" +
       (sessao.desafioFeito ? "sim" : "não") +

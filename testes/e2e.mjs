@@ -70,6 +70,12 @@ ok(await resolver(), 'tabuleiro resolvido por cliques');
 ok(await ev(() => sessao.completados) === 1, 'completados = 1');
 ok(await ev(() => sessao.ganho) > ganhou0, 'prêmio pago');
 ok(await ev(() => sessao.sequencia) === 1, 'sequência = 1 (resolvido no par)');
+// a régua de leitura é medida no tabuleiro servido e guardada por tabuleiro
+{
+  const l = await ev(() => sessao.leitura);
+  ok(l.length === 1 && parseFloat(l[0]) > 0 && parseFloat(l[0]) <= 1,
+    `leitura do tabuleiro registrada (${l[0]})`);
+}
 
 console.log('T3 dica via anúncio simulado');
 await page.click('#btDica');
@@ -132,9 +138,22 @@ ok(await ev(() => sessao.gastoRecipientes) === g0, 'não cobrou nada (veio do es
 ok(await ev(() => estoqueRecipientes) === 0, 'estoque baixou');
 
 console.log('T9 fim de sessão e zerar');
+ok(await resolver(), 'tabuleiro resolvido antes de encerrar (pro resumo ter conteúdo)');
 await page.click('#btMenu');   // os instrumentos moram no menu ⚙
 await page.click('#btParei');
 ok(await ev(() => document.getElementById('telaFim').classList.contains('on')), 'tela de veredito abriu');
+// o resumo copiável é o único jeito de os números saírem daqui — se a régua
+// nova não estiver nele, ela não existe pra próxima sessão
+{
+  const txt = await ev(() => resumo);
+  const linha = txt.split('\n').find(l => l.startsWith('Leitura do tabuleiro:'));
+  const vals = (linha ? linha.split(':')[1].split(',') : [])
+    .map(s => s.trim()).filter(Boolean).map(Number);
+  const tabs = await ev(() => sessao.completados);
+  ok(!!linha, 'resumo traz a leitura do tabuleiro');
+  ok(vals.length === tabs && vals.every(v => v > 0 && v <= 1),
+    `um valor de leitura por tabuleiro completado (${vals.length}/${tabs}), todos em 0..1`);
+}
 await page.click('#btZerar');
 await page.waitForFunction('!sessao.encerrada && jogo.par > 0', { timeout: 15000 });
 ok(await ev(() => localStorage.getItem('sort-idle-v1')) === null, 'save apagado');

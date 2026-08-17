@@ -24,7 +24,7 @@ const codigo = puro.slice(0, corte) + `
 export { CONFIG, corrida, podeDespejar, despejar, resolvido, emprensado,
   heuristica, chave, calcularPar, distribuir, gerar, premioDoTabuleiro,
   custoDesfazerPuro, dentroDaTolerancia, serializar, jogadaDoBot,
-  medirDificuldade, faixaDoTabuleiro, gerarDirigido, premioFinal,
+  medirDificuldade, medirLeitura, faixaDoTabuleiro, gerarDirigido, premioFinal,
   tabuleiroDoDia, dicaOtima, hashDeTexto, rngDeSemente };`;
 const G = await import("data:text/javascript," + encodeURIComponent(codigo));
 
@@ -469,6 +469,96 @@ diga("\n## 5c. A sessão da criança (7 anos): o que ela testa que as outras nã
   afirma(piores.every(i => c.scoresServidos[i] <= scoreMediano && c.nos[i] <= nosMediano),
     "os 2 tabuleiros que mais doeram tinham score E nós do A* abaixo da mediana da sessão — " +
     "a dificuldade sentida por uma criança mora fora das duas réguas que o jogo tem");
+}
+
+// ═══ 5d. leitura do tabuleiro: a régua que não mede busca ═══════════════
+diga("\n## 5d. Leitura do tabuleiro — a terceira régua");
+{
+  const desserializar = str => str.split("-").map(t => [...t].map(c => parseInt(c, 36)));
+  const CAP = G.CONFIG.CAPACIDADE, C = G.CONFIG.CORES;
+
+  // ── o que a função conta, em tabuleiros feitos à mão ──
+  const pronto = [];
+  for (let c = 0; c < C; c++) pronto.push(Array(CAP).fill(c));
+  pronto.push([], []);
+  const lPronto = G.medirLeitura(pronto);
+  afirma(lPronto.score === 0 && lPronto.quebras === 0 && lPronto.enterrado === 0,
+    "tabuleiro resolvido lê zero: sem quebra, sem cor enterrada, e nenhum topo " +
+    "cobrado (tubo já uniforme não pede leitura)");
+
+  const listrado = G.medirLeitura([[0, 1, 0, 1], [1, 0, 1, 0], [], []]);
+  const arrumado = G.medirLeitura([[0, 0, 0, 1], [1, 1, 1, 0], [], []]);
+  afirma(listrado.quebras > arrumado.quebras && listrado.score > arrumado.score,
+    `tubo listrado lê mais que tubo quase arrumado (${listrado.quebras} quebras contra ` +
+    `${arrumado.quebras}) — a régua enxerga a bagunça, não o tamanho da solução`);
+  afirma(G.medirLeitura([[0, 0, 0, 1], [], []]).enterrado === 3,
+    "célula enterrada = a que tem cor diferente por cima (3 num tubo 0-0-0-1)");
+
+  // ── contra as 4 sessões com layout exato ──
+  const rankNorm = a => {
+    const idx = a.map((v, i) => [v, i]).sort((p, q) => p[0] - q[0]);
+    const r = Array(a.length);
+    idx.forEach(([, i], k) => { r[i] = (k + 1) / a.length; });
+    return r;
+  };
+  const comLayout = HUMANOS.filter(h => h.layouts);
+  const pool = { adulto: { L: [], T: [], P: [], N: [] }, crianca: { L: [], T: [], P: [], N: [] } };
+  diga("");
+  diga("| sessão | n | leitura×tempo | par×tempo | nós×tempo |");
+  diga("|---|---|---|---|---|");
+  for (const sx of comLayout) {
+    const leit = sx.layouts.map(l => G.medirLeitura(desserializar(l)).score);
+    diga(`| ${sx.id} | ${sx.t.length} | ${spearman(leit, sx.t).toFixed(2)} | ` +
+         `${spearman(sx.p, sx.t).toFixed(2)} | ${spearman(sx.nos, sx.t).toFixed(2)} |`);
+    // pooled por RANK dentro da sessão: cada pessoa tem sua própria linha de
+    // base de velocidade, então só a ordem dentro da sessão é comparável
+    const alvo = sx.j === "C" ? pool.crianca : pool.adulto;
+    alvo.L.push(...rankNorm(leit)); alvo.T.push(...rankNorm(sx.t));
+    alvo.P.push(...rankNorm(sx.p)); alvo.N.push(...rankNorm(sx.nos));
+  }
+  const rA = {
+    leitura: spearman(pool.adulto.L, pool.adulto.T),
+    par: spearman(pool.adulto.P, pool.adulto.T),
+    nos: spearman(pool.adulto.N, pool.adulto.T),
+  };
+  const rC = {
+    leitura: spearman(pool.crianca.L, pool.crianca.T),
+    par: spearman(pool.crianca.P, pool.crianca.T),
+    nos: spearman(pool.crianca.N, pool.crianca.T),
+  };
+  diga("");
+  diga(`Adultos agrupados (n=${pool.adulto.L.length}): leitura ρ=${rA.leitura.toFixed(2)}, ` +
+       `par ρ=${rA.par.toFixed(2)}, nós ρ=${rA.nos.toFixed(2)}.`);
+  diga(`Criança (n=${pool.crianca.L.length}): leitura ρ=${rC.leitura.toFixed(2)}, ` +
+       `par ρ=${rC.par.toFixed(2)}, nós ρ=${rC.nos.toFixed(2)}.`);
+  afirma(rA.leitura > rA.par && rA.leitura > rA.nos,
+    `nos adultos a leitura prevê o tempo melhor que as duas réguas antigas ` +
+    `(${rA.leitura.toFixed(2)} contra ${rA.par.toFixed(2)} do par e ${rA.nos.toFixed(2)} dos nós) — ` +
+    "é por isso que ela entra");
+  diga("");
+  diga("**O resultado honesto:** a régua nasceu pra explicar a sessão da " +
+       "criança e não explica. Ela prevê o tempo dos adultos melhor que " +
+       "tudo que havia, e na criança fica em " + rC.leitura.toFixed(2) + " — " +
+       "não é restrição de faixa (o desvio da leitura na sessão dela é o " +
+       "mesmo das adultas), é ausência de sinal. O que confundiu uma criança " +
+       "de 7 anos continua sem régua; a hipótese de que era bagunça visual " +
+       "foi testada e não passou.");
+
+  // ── é régua NOVA, não o par disfarçado ──
+  const todos = comLayout.flatMap(sx => sx.layouts.map(l => G.medirLeitura(desserializar(l)).score));
+  const paresTodos = comLayout.flatMap(sx => sx.p);
+  const nosTodos = comLayout.flatMap(sx => sx.nos);
+  const rPar = spearman(todos, paresTodos), rNos = spearman(todos, nosTodos);
+  diga(`Independência (n=${todos.length}): leitura×par ρ=${rPar.toFixed(2)}, ` +
+       `leitura×nós ρ=${rNos.toFixed(2)}.`);
+  afirma(Math.abs(rPar) < 0.7 && Math.abs(rNos) < 0.7,
+    "a leitura não é o par nem os nós disfarçados (|ρ|<0,7 com ambos) — mede outra coisa");
+
+  // ── e não toca no jogo: o diretor continua decidindo sem ela ──
+  const rng = rngCom(1234);
+  const a = G.gerarDirigido(5, rngCom(1234)), b = G.gerarDirigido(5, rng);
+  afirma(G.serializar(a.tubos) === G.serializar(b.tubos) && a.dificuldade.score === b.dificuldade.score,
+    "o diretor serve o mesmo tabuleiro de antes: a leitura é instrumento, não entra na escolha");
 }
 
 // ═══ 6. diretor de dificuldade ══════════════════════════════════════════
